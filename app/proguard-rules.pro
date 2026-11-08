@@ -1,4 +1,6 @@
-# Add project specific ProGuard rules if necessary
+# Add project specific ProGuard rules here.
 -keepattributes *Annotation*
--keep class com.example.lmstudio.data.model.** { *; }
--keep class com.example.lmstudio.data.api.** { *; }
+-keepattributes SourceFile,LineNumberTable
+-keep class com.example.dashboardlmstudio.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
