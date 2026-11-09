@@ -100,20 +100,22 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}
-          name: Release ${{ github.ref == 'refs/heads/main' && format('{0}', github.run_number) || github.ref_name }}
-          body: |
-            ## What's New
-            - Auto-generated release from CI pipeline
-            - Triggered by: ${{ github.event_name }}
-            - Build time: ${{ github.event.head_commit.timestamp }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}"
+          RELEASE_NAME="Release $TAG_NAME"
+          BODY="## What's New
+- Auto-generated release from CI pipeline
+- Triggered by: ${{ github.event_name }}
+- Build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
-            ### Download
-            [Download APK](https://github.com/${{ github.repository }}/releases/download/${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}/app-release.apk)
-        files: app/build/outputs/apk/release/app-release.apk
-        token: ${{ secrets.GITHUB_TOKEN }}
+### Download
+[Download APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-release.apk)"
+          gh release create "$TAG_NAME" \
+            --title "$RELEASE_NAME" \
+            --body "$BODY" \
+            app/build/outputs/apk/release/app-release.apk
 
   publish-to-github-packages:
     name: Publish to GitHub Packages
