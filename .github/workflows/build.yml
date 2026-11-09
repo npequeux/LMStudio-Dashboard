@@ -7,8 +7,6 @@ on:
       - 'v*'
   pull_request:
     branches: [ main, develop ]
-  merge_group:
-    branches: [ main ]
   workflow_dispatch:
 
 env:
@@ -48,7 +46,7 @@ jobs:
   lint-check:
     name: Lint & Static Analysis
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    if: github.event_name == 'pull_request'
 
     steps:
       - name: Checkout code
