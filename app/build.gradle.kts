@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("maven-publish")
 }
 
 android {
@@ -88,8 +89,8 @@ publishing {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/npequeux/LMStudio-Dashboard")
             credentials {
-                username = findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR") ?: ""
-                password = findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN") ?: ""
+                username = findProperty("gpr.user")?.toString() ?: System.getenv("GITHUB_ACTOR") ?: ""
+                password = findProperty("gpr.key")?.toString() ?: System.getenv("GITHUB_TOKEN") ?: ""
             }
         }
     }
