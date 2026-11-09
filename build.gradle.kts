@@ -1,22 +1,6 @@
-// Top-level build file
-buildscript {
-    ext.kotlin_version = '1.9.20'
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.4'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
-
+// Top-level build file using Kotlin DSL with version catalogs (libs.versions.toml)
 plugins {
-    id 'com.android.application' version '8.1.4' apply false
-    id 'com.android.library' version '8.1.4' apply false
-    id 'org.jetbrains.kotlin.android' version '1.9.20' apply false
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
 }
