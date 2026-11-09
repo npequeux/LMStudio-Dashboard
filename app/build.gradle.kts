@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'maven-publish'
 }
 
 android {
@@ -63,4 +64,30 @@ dependencies {
 
     // Gson for JSON parsing
     implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+// GitHub Packages publishing configuration
+publishing {
+    publications {
+        create<MavenPublication>("release") {
+            groupId = "com.example.dashboardlmstudio"
+            artifactId = "dashboard-lmstudio"
+            version = android.defaultConfig.versionName
+
+            afterEvaluate {
+                from(components["release"])
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/npequeux/LMStudio-Dashboard")
+            credentials {
+                username = findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR") ?: ""
+                password = findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN") ?: ""
+            }
+        }
+    }
 }
