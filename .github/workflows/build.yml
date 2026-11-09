@@ -105,15 +105,14 @@ jobs:
         run: |
           TAG_NAME="${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}"
           RELEASE_NAME="Release $TAG_NAME"
-          cat > /tmp/release_body.txt << ENDOFBODY
-## What's New
-- Auto-generated release from CI pipeline
-- Triggered by: ${{ github.event_name }}
-- Build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
-
-### Download
-[Download APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-release.apk)
-ENDOFBODY
+          printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+            "## What's New" \
+            "- Auto-generated release from CI pipeline" \
+            "- Triggered by: ${{ github.event_name }}" \
+            "- Build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            "" \
+            "### Download" \
+            "[Download APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-release.apk)" > /tmp/release_body.txt
           gh release create "$TAG_NAME" \
             --title "$RELEASE_NAME" \
             --body-file /tmp/release_body.txt \
