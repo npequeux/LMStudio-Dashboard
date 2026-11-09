@@ -1,5 +1,6 @@
 # DashboardLMStudio - Android Monitoring App
 
+
 ## Overview
 A real-time monitoring dashboard application for LM Studio servers running on your local network or remote machines.
 
