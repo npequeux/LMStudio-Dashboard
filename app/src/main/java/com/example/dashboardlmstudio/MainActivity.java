@@ -31,6 +31,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupViews() {
         EditText serverUrlInput = findViewById(R.id.etServerUrl);
+        String savedServerUrl = getSharedPreferences("settings", MODE_PRIVATE)
+                .getString("server_url", getString(R.string.hint_server_url));
+        serverUrlInput.setText(savedServerUrl);
+
         Button btnConnect = findViewById(R.id.btnConnect);
         Button btnStartMonitoring = findViewById(R.id.btnStartMonitoring);
         ProgressBar progressBar = findViewById(R.id.progressBar);
@@ -54,6 +58,10 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Please enter server URL", Toast.LENGTH_SHORT).show();
                 return;
             }
+            getSharedPreferences("settings", MODE_PRIVATE)
+                    .edit()
+                    .putString("server_url", url)
+                    .apply();
             viewModel.connect(url);
         });
 

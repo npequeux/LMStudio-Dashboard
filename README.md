@@ -26,7 +26,7 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 ## Connect and use
 
 1. Start the companion metrics bridge on the PC and make it reachable from the phone. Keep the PC and phone on the same trusted network, and allow TCP port 8000 through the PC firewall for Private networks.
-2. Enter the bridge's base URL, for example `http://192.168.129.35:8000` (use the PC's LAN IP, not `localhost` and not LM Studio's port 1234).
+2. The server URL is prefilled as `http://192.168.129.35:8000`; change it if the PC's LAN IP differs. The app remembers the URL after you connect.
 3. Tap **Connect**, then **Start Monitoring** after the connection succeeds. Metrics refresh every five seconds.
 4. View CPU, memory, token-speed, and error metrics returned by the bridge.
 
