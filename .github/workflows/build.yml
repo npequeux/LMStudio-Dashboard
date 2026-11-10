@@ -100,8 +100,9 @@ jobs:
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}
         run: |
-          TAG_NAME="${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}"
+          TAG_NAME="$RELEASE_TAG"
           RELEASE_NAME="Release $TAG_NAME"
           printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
             "## What's New" \
@@ -113,7 +114,7 @@ jobs:
             "[Download APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-release.apk)" > /tmp/release_body.txt
           gh release create "$TAG_NAME" \
             --title "$RELEASE_NAME" \
-            --body-file /tmp/release_body.txt \
+            --notes-file /tmp/release_body.txt \
             app/build/outputs/apk/release/app-release.apk
 
   publish-to-github-packages:
