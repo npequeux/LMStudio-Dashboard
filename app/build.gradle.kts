@@ -79,7 +79,7 @@ publishing {
             version = android.defaultConfig.versionName.toString()
 
             afterEvaluate {
-                from(components["release"])
+                from(components["androidRelease"])
             }
         }
     }
