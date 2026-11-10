@@ -63,8 +63,11 @@ public class DashboardViewModel extends AndroidViewModel {
     }
 
     public void startMonitoring(long intervalMs) {
-        if (apiClient == null || !serverUrl.equals("")) {
+        if (apiClient == null || serverUrl == null || serverUrl.trim().isEmpty()) {
             errorMessage.postValue("Not connected. Please connect first.");
+            return;
+        }
+        if (scheduler != null && !scheduler.isShutdown()) {
             return;
         }
 

@@ -76,6 +76,8 @@ jobs:
     name: Release APK (${{ github.event_name }})
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: >-
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       startsWith(github.ref, 'refs/tags/v')
@@ -94,7 +96,27 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Decode release signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for secret_value in "$ANDROID_KEYSTORE_BASE64" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD"; do
+            if [ -z "$secret_value" ]; then
+              echo "::error::Configure all ANDROID_KEYSTORE_* and ANDROID_KEY_* repository secrets before creating a release."
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release-key.jks
+          test -s app/release-key.jks
+
       - name: Build release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Create GitHub Release
@@ -121,6 +143,9 @@ jobs:
     name: Publish to GitHub Packages
     needs: [ build, release ]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     if: >-
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       startsWith(github.ref, 'refs/tags/v')
@@ -139,10 +164,21 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build release APK and publish
-        run: ./gradlew assembleRelease publishReleasePublicationTo-github-packages --no-daemon
+      - name: Decode release signing keystore
         env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Configure ANDROID_KEYSTORE_BASE64 before publishing."; exit 1; }
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release-key.jks
+          test -s app/release-key.jks
+
+      - name: Build release APK and publish
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew assembleRelease publishReleasePublicationToGitHubPackagesRepository --no-daemon
 
   notify:
     name: Notify on Success/Failure
