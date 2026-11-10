@@ -79,7 +79,12 @@ publishing {
             version = android.defaultConfig.versionName.toString()
 
             afterEvaluate {
-                from(components["androidRelease"])
+                val apkFile = file(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
+                if (apkFile.exists()) {
+                    artifact(file(apkFile))
+                } else {
+                    artifact(file(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")))
+                }
             }
         }
     }
