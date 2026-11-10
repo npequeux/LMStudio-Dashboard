@@ -83,11 +83,17 @@ jobs:
       startsWith(github.ref, 'refs/tags/v')
 
     steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
       - name: Download debug APK
         uses: actions/download-artifact@v4
         with:
           name: app-debug-apk-${{ github.run_number }}
           path: release-assets
+
+      - name: Package companion metrics server
+        run: zip -qr release-assets/DashboardLMStudio_MetricsServer.zip companion-metrics-server
 
       - name: Create GitHub Release
         env:
@@ -104,12 +110,14 @@ jobs:
             "- Triggered by: ${{ github.event_name }}" \
             "- Build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             "" \
-            "[Download debug APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-debug.apk)" > /tmp/release_body.txt
+            "[Download debug APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-debug.apk)" \
+            "[Download companion metrics server](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/DashboardLMStudio_MetricsServer.zip)" > /tmp/release_body.txt
           gh release create "$TAG_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_NAME" \
             --notes-file /tmp/release_body.txt \
-            release-assets/app-debug.apk
+            release-assets/app-debug.apk \
+            release-assets/DashboardLMStudio_MetricsServer.zip
 
   notify:
     name: Notify on Success/Failure

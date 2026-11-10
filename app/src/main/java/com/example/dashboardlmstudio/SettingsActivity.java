@@ -24,7 +24,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         // Load saved settings (simplified - use SharedPreferences in production)
         String savedUrl = getSharedPreferences("settings", MODE_PRIVATE)
-                .getString("server_url", "http://192.168.1.50:8000");
+                .getString("server_url", "http://192.168.129.35:8000");
         etServerUrl.setText(savedUrl);
 
         seekBarRefreshInterval.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

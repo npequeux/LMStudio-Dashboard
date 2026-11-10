@@ -7,11 +7,12 @@ An Android dashboard for viewing metrics from a reachable LM Studio-compatible s
 ## Download the app
 
 - [Download the latest temporary debug APK](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/app-debug.apk)
+- [Download the companion metrics server ZIP](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/DashboardLMStudio_MetricsServer.zip)
 - [Latest release notes](https://github.com/npequeux/LMStudio-Dashboard/releases/latest)
 - [All releases](https://github.com/npequeux/LMStudio-Dashboard/releases)
 - [GitHub Actions builds](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) — temporary debug APK artifacts may require signing in to GitHub.
 
-The direct APK link becomes available after the first successful debug release. This temporary build uses the `.debug` application ID and debug signing, and is for testing only. Each CI run may generate a different debug key; uninstall an older debug build before installing a new one if Android rejects the update. The app requires Android 8.0 (API 26) or later.
+The direct APK and companion ZIP links become available after the next successful GitHub Release. This temporary build uses the `.debug` application ID and debug signing, and is for testing only. Each CI run may generate a different debug key; uninstall an older debug build before installing a new one if Android rejects the update. The app requires Android 8.0 (API 26) or later.
 
 ## Install on Android
 
@@ -25,17 +26,17 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 ## Connect and use
 
 1. Start the companion metrics bridge on the PC and make it reachable from the phone. Keep the PC and phone on the same trusted network, and allow TCP port 8000 through the PC firewall for Private networks.
-2. Enter the bridge's base URL, for example `http://192.168.1.50:8000` (use the PC's LAN IP, not `localhost` and not LM Studio's port 1234).
+2. Enter the bridge's base URL, for example `http://192.168.129.35:8000` (use the PC's LAN IP, not `localhost` and not LM Studio's port 1234).
 3. Tap **Connect**, then **Start Monitoring** after the connection succeeds. Metrics refresh every five seconds.
 4. View CPU, memory, token-speed, and error metrics returned by the bridge.
 
-The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM Studio itself does not implement those routes, which is why pointing the app directly to LM Studio produces an unexpected-endpoint response. The bridge proxies LM Studio's model/inference API and supplies the dashboard's metrics routes. Plain HTTP is used for this local-network setup; do not expose it to public networks.
+The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM Studio itself does not implement those routes, which is why pointing the app directly to LM Studio produces an unexpected-endpoint response. The bridge proxies LM Studio's model/inference API and supplies the dashboard's metrics routes. Its source and run instructions are in the sibling `Dashboard_LMStudio_MetricsServer` folder. The dashboard does not generate completions, so `tokenPerSecond` stays at 0 unless inference requests from another client are routed through the bridge. Plain HTTP is used for this local-network setup; do not expose it to public networks.
 
 ### PC requirements
 
-- Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download) and start its API server from the **Developer** tab. The bridge defaults to `http://127.0.0.1:1234`; configure `LM_STUDIO_URL` if yours differs.
-- Run the Python companion service from the sibling folder `Dashboard_LMStudio_MetricsServer`; its README contains install and startup steps.
-- Enter the bridge URL (`http://<PC-LAN-IP>:8000`) in the Android app. LM Studio does not need to be exposed directly to the LAN.
+- Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download) and start its API server from the **Developer** tab. The bridge defaults to `http://192.168.129.35:1234/v1`; configure `LM_STUDIO_URL` if yours differs.
+- Run the Python companion service from the `companion-metrics-server` folder in this repository, or download and extract the [companion metrics ZIP](https://github.com/npequx/LMStudio-Dashboard/releases/latest/download/DashboardLMStudio_MetricsServer.zip). Its default upstream is `http://192.168.129.35:1234/v1`.
+- Enter the bridge URL (`http://192.168.129.35:8000`) in the Android app. LM Studio must be reachable at the configured upstream address.
 
 ## Features
 - Live CPU, memory, and token-speed metric cards
