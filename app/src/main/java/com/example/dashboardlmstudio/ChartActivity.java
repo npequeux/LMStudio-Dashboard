@@ -44,7 +44,8 @@ public class ChartActivity extends AppCompatActivity {
     }
 
     public void updateCpuChart(float[] values) {
-        cpuChart.getData().getDataSets().get(0).setValues(getEntries(values));
+        LineDataSet cpuSet = (LineDataSet) cpuChart.getData().getDataSets().get(0);
+        cpuSet.setValues(getEntries(values));
         cpuChart.notifyDataSetChanged();
         cpuChart.invalidate();
     }
