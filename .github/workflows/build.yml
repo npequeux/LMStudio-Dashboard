@@ -118,7 +118,7 @@ jobs:
 
   publish-to-github-packages:
     name: Publish to GitHub Packages
-    needs: build
+    needs: [ build, release ]
     runs-on: ubuntu-latest
     if: >-
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
@@ -138,8 +138,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build and publish AAR
-        run: ./gradlew publishReleasePublicationTo-github-packages --no-daemon
+      - name: Build release APK and publish
+        run: ./gradlew assembleRelease publishReleasePublicationTo-github-packages --no-daemon
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

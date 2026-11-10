@@ -79,7 +79,7 @@ publishing {
             version = android.defaultConfig.versionName.toString()
 
             // Use task-based lazy artifact registration (AGP 8+ compatible)
-            artifact(tasks.named("packageDebug").flatMap { it.outputs.files })
+            artifact(tasks.named("packageRelease").flatMap { it.outputs.files })
         }
     }
 
