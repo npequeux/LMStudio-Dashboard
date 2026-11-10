@@ -83,41 +83,11 @@ jobs:
       startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+      - name: Download debug APK
+        uses: actions/download-artifact@v4
         with:
-          java-version: '${{ env.JAVA_VERSION }}'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Decode release signing keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          for secret_value in "$ANDROID_KEYSTORE_BASE64" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD"; do
-            if [ -z "$secret_value" ]; then
-              echo "::error::Configure all ANDROID_KEYSTORE_* and ANDROID_KEY_* repository secrets before creating a release."
-              exit 1
-            fi
-          done
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release-key.jks
-          test -s app/release-key.jks
-
-      - name: Build release APK
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon
+          name: app-debug-apk-${{ github.run_number }}
+          path: release-assets
 
       - name: Create GitHub Release
         env:
@@ -125,60 +95,21 @@ jobs:
           RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}
         run: |
           TAG_NAME="$RELEASE_TAG"
-          RELEASE_NAME="Release $TAG_NAME"
+          RELEASE_NAME="Release $TAG_NAME (temporary debug build)"
           printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
-            "## What's New" \
-            "- Auto-generated release from CI pipeline" \
+            "## Temporary debug release" \
+            "- This APK is debug-signed and intended for testing, not production or Play Store distribution." \
+            "- Its application ID has the .debug suffix." \
+            "- A later CI run may use a different debug key; uninstall an older debug build if Android refuses the update." \
             "- Triggered by: ${{ github.event_name }}" \
             "- Build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             "" \
-            "### Download" \
-            "[Download APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-release.apk)" > /tmp/release_body.txt
+            "[Download debug APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-debug.apk)" > /tmp/release_body.txt
           gh release create "$TAG_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_NAME" \
             --notes-file /tmp/release_body.txt \
-            app/build/outputs/apk/release/app-release.apk
-
-  publish-to-github-packages:
-    name: Publish to GitHub Packages
-    needs: [ build, release ]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    if: >-
-      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-      startsWith(github.ref, 'refs/tags/v')
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: '${{ env.JAVA_VERSION }}'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Decode release signing keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Configure ANDROID_KEYSTORE_BASE64 before publishing."; exit 1; }
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release-key.jks
-          test -s app/release-key.jks
-
-      - name: Build release APK and publish
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew assembleRelease publishReleasePublicationToGitHubPackagesRepository --no-daemon
+            release-assets/app-debug.apk
 
   notify:
     name: Notify on Success/Failure
