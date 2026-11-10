@@ -78,14 +78,8 @@ publishing {
             artifactId = "dashboard-lmstudio"
             version = android.defaultConfig.versionName.toString()
 
-            afterEvaluate {
-                val apkFile = file(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
-                if (apkFile.exists()) {
-                    artifact(file(apkFile))
-                } else {
-                    artifact(file(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")))
-                }
-            }
+            // Use task-based lazy artifact registration (AGP 8+ compatible)
+            artifact(tasks.named("packageDebug").flatMap { it.outputs.files })
         }
     }
 
