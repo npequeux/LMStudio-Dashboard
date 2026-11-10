@@ -78,8 +78,8 @@ publishing {
             artifactId = "dashboard-lmstudio"
             version = android.defaultConfig.versionName.toString()
 
-            // Use task-based lazy artifact registration (AGP 8+ compatible)
-            artifact(tasks.named("packageRelease").flatMap { it.outputs.files })
+            // Use lazy RegularFileProperty (resolves at publish time, not config)
+            artifact(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
         }
     }
 
