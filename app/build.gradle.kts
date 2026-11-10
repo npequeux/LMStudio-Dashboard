@@ -80,6 +80,8 @@ dependencies {
 
     // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.10.1")
+
+    testImplementation("junit:junit:4.13.2")
 }
 
 // GitHub Packages publishing configuration

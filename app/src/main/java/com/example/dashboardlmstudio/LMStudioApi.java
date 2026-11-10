@@ -29,13 +29,13 @@ public class LMStudioApi {
     }
 
     public static class Metrics {
-        private int cpuUsage;
+        private double cpuUsage;
         private long memoryUsedMB;
         private double tokenPerSecond;
         private int errorCount;
         private List<ErrorLogEntry> errors;
 
-        public int getCpuUsage() { return cpuUsage; }
+        public double getCpuUsage() { return cpuUsage; }
         public long getMemoryUsedMB() { return memoryUsedMB; }
         public double getTokenPerSecond() { return tokenPerSecond; }
         public int getErrorCount() { return errorCount; }

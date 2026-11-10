@@ -16,7 +16,13 @@ By default the bridge connects to LM Studio at `http://192.168.129.35:1234/v1`. 
 
 ## Install and run on Windows
 
-Open PowerShell in this folder and install the dependencies:
+Open PowerShell in the extracted `companion-metrics-server` folder—the folder containing `pyproject.toml`. Verify you are in the correct directory:
+
+```powershell
+Test-Path .\pyproject.toml
+```
+
+It must return `True`. If it returns `False`, change directory into the extracted `companion-metrics-server` folder before continuing. Install the dependencies:
 
 ```powershell
 uv sync
