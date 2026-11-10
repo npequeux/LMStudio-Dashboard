@@ -31,6 +31,14 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 
 The app currently calls `GET /health` for connection checks and `GET /api/v1/metrics` for monitoring data. The metrics response should use `cpuUsage`, `memoryUsedMB`, `tokenPerSecond`, `errorCount`, and optionally `errors`. Confirm that your server exposes these routes; this Android project does not provide the metrics service. Plain HTTP is supported for local-network use, so use it only on a network you trust.
 
+### PC requirements
+
+- Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download).
+- Start its API server from the **Developer** tab. See the [LM Studio server guide](https://lmstudio.ai/docs/developer/core/server).
+- To connect from a phone, enable [Serve on Local Network](https://lmstudio.ai/docs/developer/core/server/serve-on-network) and use the network address shown by LM Studio.
+
+**Important:** LM Studio alone does not supply the dashboard's `/health` and `/api/v1/metrics` routes for CPU, memory, token speed, and errors. You also need a compatible companion metrics service or proxy running on the PC. This repository does not include that service or provide a download link for one.
+
 ## Features
 - Live CPU, memory, and token-speed metric cards
 - Error count and error log display
