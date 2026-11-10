@@ -42,7 +42,7 @@ data class ErrorLog(
 @Serializable
 data class ModelInfo(
     val id: String,
-    val object: String = "model",
-    val ownedBy: String? = null,
+    @SerialName("object") val objectType: String = "model",
+    @SerialName("owned_by") val ownedBy: String? = null,
     val created: Long = 0
 )
