@@ -93,7 +93,7 @@ jobs:
           path: release-assets
 
       - name: Package companion metrics server
-        run: zip -qr release-assets/DashboardLMStudio_MetricsServer.zip companion-metrics-server
+        run: python3 .github/scripts/package_companion.py --output release-assets/DashboardLMStudio_MetricsServer.zip
 
       - name: Create GitHub Release
         env:
