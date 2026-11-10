@@ -15,7 +15,7 @@
     <string name="btn_connect">Connect</string>
     <string name="btn_disconnect">Disconnect</string>
     <string name="lbl_server_url">Server URL</string>
-    <string name="hint_server_url">http://192.168.1.100:1234</string>
+    <string name="hint_server_url">http://192.168.1.50:8000</string>
     <string name="lbl_refresh_interval">Refresh (sec)</string>
     <string name="btn_start_monitoring">Start Monitoring</string>
     <string name="btn_stop_monitoring">Stop Monitoring</string>

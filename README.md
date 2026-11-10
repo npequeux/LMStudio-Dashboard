@@ -24,20 +24,18 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 
 ## Connect and use
 
-1. Start the server on your computer and make it reachable from the phone. The phone and server usually need to be on the same network; allow the server through the computer's firewall.
-2. Enter the server's base URL, for example `http://192.168.1.50:1234` (use the computer's LAN IP and actual port, not `localhost`).
+1. Start the companion metrics bridge on the PC and make it reachable from the phone. Keep the PC and phone on the same trusted network, and allow TCP port 8000 through the PC firewall for Private networks.
+2. Enter the bridge's base URL, for example `http://192.168.1.50:8000` (use the PC's LAN IP, not `localhost` and not LM Studio's port 1234).
 3. Tap **Connect**, then **Start Monitoring** after the connection succeeds. Metrics refresh every five seconds.
-4. View CPU, memory, token-speed, and error metrics returned by the server.
+4. View CPU, memory, token-speed, and error metrics returned by the bridge.
 
-The app currently calls `GET /health` for connection checks and `GET /api/v1/metrics` for monitoring data. The metrics response should use `cpuUsage`, `memoryUsedMB`, `tokenPerSecond`, `errorCount`, and optionally `errors`. Confirm that your server exposes these routes; this Android project does not provide the metrics service. Plain HTTP is supported for local-network use, so use it only on a network you trust.
+The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM Studio itself does not implement those routes, which is why pointing the app directly to LM Studio produces an unexpected-endpoint response. The bridge proxies LM Studio's model/inference API and supplies the dashboard's metrics routes. Plain HTTP is used for this local-network setup; do not expose it to public networks.
 
 ### PC requirements
 
-- Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download).
-- Start its API server from the **Developer** tab. See the [LM Studio server guide](https://lmstudio.ai/docs/developer/core/server).
-- To connect from a phone, enable [Serve on Local Network](https://lmstudio.ai/docs/developer/core/server/serve-on-network) and use the network address shown by LM Studio.
-
-**Important:** LM Studio alone does not supply the dashboard's `/health` and `/api/v1/metrics` routes for CPU, memory, token speed, and errors. You also need a compatible companion metrics service or proxy running on the PC. This repository does not include that service or provide a download link for one.
+- Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download) and start its API server from the **Developer** tab. The bridge defaults to `http://127.0.0.1:1234`; configure `LM_STUDIO_URL` if yours differs.
+- Run the Python companion service from the sibling folder `Dashboard_LMStudio_MetricsServer`; its README contains install and startup steps.
+- Enter the bridge URL (`http://<PC-LAN-IP>:8000`) in the Android app. LM Studio does not need to be exposed directly to the LAN.
 
 ## Features
 - Live CPU, memory, and token-speed metric cards
