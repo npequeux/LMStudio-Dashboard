@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import importlib
 import json
 import os
 import time
@@ -23,30 +24,112 @@ class Settings:
     lm_studio_api_key: str | None = field(default_factory=lambda: os.getenv("LM_STUDIO_API_KEY"))
 
 
-def collect_system_metrics() -> tuple[float, int]:
+@dataclass(frozen=True)
+class HostMetrics:
+    cpu_usage: float
+    memory_used_mb: int
+    gpu_usage: float | None = None
+    gpu_memory_used_mb: int | None = None
+    gpu_memory_total_mb: int | None = None
+
+
+def collect_gpu_metrics(nvml_module: Any | None = None) -> tuple[float | None, int | None, int | None]:
+    """Return NVIDIA utilization and aggregate VRAM, or None values if unavailable."""
+    nvml = nvml_module
+    initialized = False
+    try:
+        if nvml is None:
+            nvml = importlib.import_module("pynvml")
+        nvml.nvmlInit()
+        initialized = True
+        device_count = int(nvml.nvmlDeviceGetCount())
+        if device_count <= 0:
+            return None, None, None
+
+        utilizations: list[float] = []
+        used_bytes = 0
+        total_bytes = 0
+        for index in range(device_count):
+            handle = nvml.nvmlDeviceGetHandleByIndex(index)
+            utilization = nvml.nvmlDeviceGetUtilizationRates(handle)
+            memory = nvml.nvmlDeviceGetMemoryInfo(handle)
+            utilizations.append(float(utilization.gpu))
+            used_bytes += int(memory.used)
+            total_bytes += int(memory.total)
+
+        mb = 1024 * 1024
+        return round(sum(utilizations) / len(utilizations), 1), int(used_bytes / mb), int(total_bytes / mb)
+    except Exception:
+        # NVML is unavailable on non-NVIDIA systems or when the driver is not running.
+        return None, None, None
+    finally:
+        if initialized:
+            try:
+                nvml.nvmlShutdown()
+            except Exception:
+                pass
+
+
+def collect_system_metrics() -> HostMetrics:
     cpu_usage = psutil.cpu_percent(interval=None)
     memory_used_mb = int(psutil.virtual_memory().used / (1024 * 1024))
-    return cpu_usage, memory_used_mb
+    gpu_usage, gpu_memory_used_mb, gpu_memory_total_mb = collect_gpu_metrics()
+    return HostMetrics(cpu_usage, memory_used_mb, gpu_usage, gpu_memory_used_mb, gpu_memory_total_mb)
 
 
-def _completion_tokens_from_json(body: bytes) -> int:
+def _int_or_zero(value: Any) -> int:
     try:
-        data = json.loads(body)
-        return max(0, int(data.get("usage", {}).get("completion_tokens", 0)))
-    except (ValueError, TypeError, AttributeError):
+        return max(0, int(value or 0))
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
-def _completion_tokens_from_sse(body: bytes) -> int:
-    completion_tokens = 0
+def _usage_from_payload(data: Any) -> dict[str, int | float] | None:
+    if not isinstance(data, dict):
+        return None
+    raw_usage = data.get("usage")
+    raw_stats = data.get("stats")
+    usage: dict[str, Any] = raw_usage if isinstance(raw_usage, dict) else {}
+    stats: dict[str, Any] = raw_stats if isinstance(raw_stats, dict) else {}
+    if not usage and not stats:
+        return None
+
+    result: dict[str, int | float] = {
+        "prompt_tokens": _int_or_zero(usage.get("prompt_tokens", usage.get("input_tokens"))),
+        "completion_tokens": _int_or_zero(
+            usage.get("completion_tokens", usage.get("output_tokens"))
+        ),
+    }
+    try:
+        if stats.get("tokens_per_second") is not None:
+            result["tokens_per_second"] = max(0.0, float(stats["tokens_per_second"]))
+    except (TypeError, ValueError, OverflowError):
+        pass
+    return result
+
+
+def _usage_from_json(body: bytes) -> dict[str, int | float] | None:
+    try:
+        return _usage_from_payload(json.loads(body))
+    except (ValueError, TypeError):
+        return None
+
+
+def _usage_from_sse(body: bytes) -> dict[str, int | float] | None:
+    latest_usage: dict[str, int | float] | None = None
     for line in body.decode("utf-8", errors="replace").splitlines():
         if not line.startswith("data:"):
             continue
         payload = line[5:].strip()
         if not payload or payload == "[DONE]":
             continue
-        completion_tokens = max(completion_tokens, _completion_tokens_from_json(payload.encode()))
-    return completion_tokens
+        try:
+            usage = _usage_from_payload(json.loads(payload))
+        except (ValueError, TypeError):
+            continue
+        if usage is not None:
+            latest_usage = usage
+    return latest_usage
 
 
 def _error_message(body: bytes, fallback: str) -> str:
@@ -64,7 +147,7 @@ def create_app(
     settings: Settings | None = None,
     *,
     state: MetricsState | None = None,
-    metrics_provider: Callable[[], tuple[float, int]] | None = None,
+    metrics_provider: Callable[[], HostMetrics] | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
