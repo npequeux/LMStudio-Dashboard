@@ -1,9 +1,10 @@
 import json
+from types import SimpleNamespace
 
 import httpx
 from fastapi.testclient import TestClient
 
-from metrics_server.app import Settings, create_app
+from metrics_server.app import HostMetrics, Settings, collect_gpu_metrics, create_app
 from metrics_server.state import MetricsState
 
 
@@ -35,7 +36,7 @@ def test_metrics_match_android_app_contract():
 
     with make_client(
         handler,
-        metrics_provider=lambda: (37.5, 2048),
+        metrics_provider=lambda: HostMetrics(37.5, 2048, 62.5, 5120, 8192),
     ) as client:
         response = client.get("/api/v1/metrics")
 
@@ -43,10 +44,44 @@ def test_metrics_match_android_app_contract():
     assert response.json() == {
         "cpuUsage": 37.5,
         "memoryUsedMB": 2048,
+        "gpuUsage": 62.5,
+        "gpuMemoryUsedMB": 5120,
+        "gpuMemoryTotalMB": 8192,
         "tokenPerSecond": 0.0,
+        "promptTokens": 0,
+        "completionTokens": 0,
         "errorCount": 0,
         "errors": [],
     }
+
+
+def test_gpu_metrics_average_utilization_and_sum_vram():
+    class FakeNvml:
+        def __init__(self):
+            self.shutdown = False
+
+        def nvmlInit(self):
+            pass
+
+        def nvmlDeviceGetCount(self):
+            return 2
+
+        def nvmlDeviceGetHandleByIndex(self, index):
+            return index
+
+        def nvmlDeviceGetUtilizationRates(self, handle):
+            return SimpleNamespace(gpu=(60, 80)[handle])
+
+        def nvmlDeviceGetMemoryInfo(self, handle):
+            used, total = ((1024, 4096), (2048, 8192))[handle]
+            return SimpleNamespace(used=used * 1024 * 1024, total=total * 1024 * 1024)
+
+        def nvmlShutdown(self):
+            self.shutdown = True
+
+    nvml = FakeNvml()
+    assert collect_gpu_metrics(nvml) == (70.0, 3072, 12288)
+    assert nvml.shutdown
 
 
 def test_models_endpoint_proxies_to_lm_studio():
@@ -94,7 +129,11 @@ def test_non_streaming_chat_updates_token_rate():
         assert request.url.path == "/v1/chat/completions"
         return httpx.Response(
             200,
-            json={"choices": [{"message": {"content": "hello"}}], "usage": {"completion_tokens": 12}},
+            json={
+                "choices": [{"message": {"content": "hello"}}],
+                "usage": {"prompt_tokens": 7, "completion_tokens": 12},
+                "stats": {"tokens_per_second": 41.8},
+            },
         )
 
     with make_client(handler) as client:
@@ -102,7 +141,35 @@ def test_non_streaming_chat_updates_token_rate():
         metrics = client.get("/api/v1/metrics").json()
 
     assert response.status_code == 200
-    assert metrics["tokenPerSecond"] > 0
+    assert metrics["promptTokens"] == 7
+    assert metrics["completionTokens"] == 12
+    assert metrics["tokenPerSecond"] == 41.8
+
+
+def test_native_lmstudio_v0_chat_records_prompt_and_native_stats():
+    def handler(request):
+        assert request.url.path == "/api/v0/chat/completions"
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "hello"}}],
+                "usage": {"prompt_tokens": 24, "completion_tokens": 53},
+                "stats": {"tokens_per_second": 51.4},
+            },
+        )
+
+    app = create_app(
+        Settings(lm_studio_url="http://lm-studio.test/v1"),
+        transport=httpx.MockTransport(handler),
+    )
+    with TestClient(app) as client:
+        response = client.post("/api/v0/chat/completions", json={"model": "test-model", "messages": []})
+        metrics = client.get("/api/v1/metrics").json()
+
+    assert response.status_code == 200
+    assert metrics["promptTokens"] == 24
+    assert metrics["completionTokens"] == 53
+    assert metrics["tokenPerSecond"] == 51.4
 
 
 def test_upstream_errors_are_exposed_to_dashboard():
@@ -123,7 +190,7 @@ def test_upstream_errors_are_exposed_to_dashboard():
 def test_streaming_chat_is_forwarded_and_records_usage():
     stream = (
         'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'
-        'data: {"choices":[],"usage":{"completion_tokens":2}}\n\n'
+        'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2},"stats":{"tokens_per_second":11.5}}\n\n'
         "data: [DONE]\n\n"
     )
 
@@ -141,4 +208,6 @@ def test_streaming_chat_is_forwarded_and_records_usage():
 
     assert response.status_code == 200
     assert response.text == stream
-    assert metrics["tokenPerSecond"] > 0
+    assert metrics["promptTokens"] == 5
+    assert metrics["completionTokens"] == 2
+    assert metrics["tokenPerSecond"] == 11.5
