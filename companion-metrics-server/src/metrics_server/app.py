@@ -207,11 +207,17 @@ def create_app(
     @app.get("/api/v1/metrics")
     async def metrics() -> dict[str, object]:
         try:
-            cpu_usage, memory_used_mb = metrics_provider()
-        except Exception as exc:  # defensive: keep endpoint available if a host counter fails
-            state.record_error(f"Could not read PC metrics: {exc}", source="system")
-            cpu_usage, memory_used_mb = 0.0, 0
-        return state.snapshot(cpu_usage, memory_used_mb)
+            host_metrics = metrics_provider()
+        except Exception as exc:  # keep metrics endpoint available if a host counter fails
+            state.record_error(f"Could not read host metrics: {exc}", source="system")
+            host_metrics = HostMetrics(cpu_usage=0.0, memory_used_mb=0)
+        return state.snapshot(
+            cpu_usage=host_metrics.cpu_usage,
+            memory_used_mb=host_metrics.memory_used_mb,
+            gpu_usage=host_metrics.gpu_usage,
+            gpu_memory_used_mb=host_metrics.gpu_memory_used_mb,
+            gpu_memory_total_mb=host_metrics.gpu_memory_total_mb,
+        )
 
     @app.get("/api/v1/errors")
     async def errors() -> list[dict[str, str]]:
