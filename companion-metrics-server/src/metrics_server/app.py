@@ -153,13 +153,16 @@ def create_app(
     settings = settings or Settings()
     state = state or MetricsState()
     metrics_provider = metrics_provider or collect_system_metrics
-    app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="0.1.0")
+    app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="0.2.0")
     app.state.metrics_state = state
 
     def target_url(path: str) -> str:
         base_url = settings.lm_studio_url.rstrip("/")
-        if base_url.endswith("/v1") and path.startswith("/v1/"):
-            return base_url + path[3:]
+        if base_url.endswith("/v1"):
+            if path.startswith("/v1/"):
+                return base_url + path[3:]
+            if path.startswith("/api/v0/"):
+                return base_url[:-3] + path
         return base_url + path
 
     def upstream_headers(content_type: str | None = None) -> dict[str, str]:
