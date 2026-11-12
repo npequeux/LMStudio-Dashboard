@@ -227,8 +227,21 @@ def create_app(
     async def models() -> Response:
         return await proxy_get("/v1/models")
 
-    @app.post("/v1/chat/completions")
-    async def chat_completions(request: Request) -> Response:
+    def record_usage(usage: dict[str, int | float] | None, elapsed_seconds: float) -> None:
+        if usage is None:
+            return
+        state.record_usage(
+            prompt_tokens=int(usage.get("prompt_tokens", 0)),
+            completion_tokens=int(usage.get("completion_tokens", 0)),
+            elapsed_seconds=elapsed_seconds,
+            tokens_per_second=(
+                float(usage["tokens_per_second"])
+                if "tokens_per_second" in usage
+                else None
+            ),
+        )
+
+    async def proxy_chat_completion(request: Request, upstream_path: str) -> Response:
         request_body = await request.body()
         try:
             payload: Any = json.loads(request_body)
@@ -242,7 +255,7 @@ def create_app(
         try:
             upstream_request = upstream_client.build_request(
                 "POST",
-                target_url("/v1/chat/completions"),
+                target_url(upstream_path),
                 content=request_body,
                 headers=upstream_headers(request.headers.get("content-type", "application/json")),
             )
@@ -266,9 +279,7 @@ def create_app(
         if not payload.get("stream", False):
             try:
                 content = await upstream.aread()
-                state.record_tokens(
-                    _completion_tokens_from_json(content), time.perf_counter() - started_at
-                )
+                record_usage(_usage_from_json(content), time.perf_counter() - started_at)
                 return relay(upstream, content)
             finally:
                 await upstream.aclose()
@@ -280,9 +291,7 @@ def create_app(
                 async for chunk in upstream.aiter_bytes():
                     collected.extend(chunk)
                     yield chunk
-                state.record_tokens(
-                    _completion_tokens_from_sse(bytes(collected)), time.perf_counter() - started_at
-                )
+                record_usage(_usage_from_sse(bytes(collected)), time.perf_counter() - started_at)
             except httpx.HTTPError as exc:
                 state.record_error(f"Streaming from LM Studio failed: {exc}", source="inference")
                 raise
@@ -295,6 +304,18 @@ def create_app(
             status_code=upstream.status_code,
             headers={"content-type": content_type},
         )
+
+    @app.get("/api/v0/models")
+    async def native_models() -> Response:
+        return await proxy_get("/api/v0/models")
+
+    @app.post("/v1/chat/completions")
+    async def chat_completions(request: Request) -> Response:
+        return await proxy_chat_completion(request, "/v1/chat/completions")
+
+    @app.post("/api/v0/chat/completions")
+    async def native_chat_completions(request: Request) -> Response:
+        return await proxy_chat_completion(request, "/api/v0/chat/completions")
 
     return app
 
