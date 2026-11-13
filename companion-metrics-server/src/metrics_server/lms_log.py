@@ -5,6 +5,7 @@ import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import threading
@@ -27,8 +28,8 @@ def _nonnegative_float(value: Any) -> float | None:
         return None
 
 
-def parse_lms_log_usage(line: str) -> dict[str, int | float] | None:
-    """Parse one `lms log stream --stats --json` prediction-output event."""
+def parse_lms_log_event(line: str) -> tuple[str, dict[str, int | float] | None] | None:
+    """Parse one diagnostics event into (event_type, usage)."""
     try:
         envelope = json.loads(line)
     except (json.JSONDecodeError, TypeError):
@@ -40,13 +41,20 @@ def parse_lms_log_usage(line: str) -> dict[str, int | float] | None:
     if not isinstance(event, dict):
         return None
     event_type = str(event.get("type", "")).lower()
+    stats = event.get("stats") or envelope.get("stats")
+    usage = _parse_stats(stats) if isinstance(stats, dict) else None
+    return event_type, usage
+
+
+def parse_lms_log_usage(line: str) -> dict[str, int | float] | None:
+    """Parse one `lms log stream --stats --json` prediction-output event."""
+    parsed = parse_lms_log_event(line)
+    if parsed is None:
+        return None
+    event_type, usage = parsed
     if event_type and not event_type.endswith("output"):
         return None
-    stats = event.get("stats") or envelope.get("stats")
-    if not isinstance(stats, dict):
-        return None
-
-    return _parse_stats(stats)
+    return usage
 
 
 def _parse_stats(stats: dict[str, Any]) -> dict[str, int | float] | None:
@@ -227,6 +235,97 @@ class LmsLogMonitor:
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=5)
         self._status = "stopped"
+
+
+_TIMING_PATTERN = re.compile(
+    r"(?:tg\s*=\s*([0-9.]+)\s*t/s|([0-9.]+)\s*tokens per second)",
+    re.IGNORECASE,
+)
+
+
+def parse_timing_line(line: str) -> float | None:
+    """Extract a live generation rate from an LM Studio server log line."""
+    match = _TIMING_PATTERN.search(line)
+    if not match:
+        return None
+    raw = match.group(1) or match.group(2)
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def _latest_server_log() -> Path | None:
+    base = Path.home() / ".lmstudio" / "server-logs"
+    if not base.is_dir():
+        return None
+    try:
+        files = sorted(
+            base.rglob("*.log"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return None
+    return files[0] if files else None
+
+
+class ServerLogMonitor:
+    """Tails LM Studio's server logs for a live generation rate.
+
+    LM Studio's diagnostics stream only reports token stats when a prediction
+    finishes. The server logs carry `tg = X t/s` / `tokens per second` timing
+    lines while a generation is running, when the runtime log verbosity is high
+    enough to include them.
+    """
+
+    def __init__(self, state: Any, enabled: bool = True) -> None:
+        self._state = state
+        self._enabled = enabled
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+
+    def start(self) -> bool:
+        if not self._enabled or self._thread is not None:
+            return False
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._run, name="lms-server-log-monitor", daemon=True
+        )
+        self._thread.start()
+        return True
+
+    def _run(self) -> None:
+        while not self._stop_event.is_set():
+            path = _latest_server_log()
+            if path is None:
+                self._stop_event.wait(5.0)
+                continue
+            try:
+                self._tail(path)
+            except OSError as exc:
+                logger.debug("LM Studio server log tail failed: %s", exc)
+                self._stop_event.wait(5.0)
+
+    def _tail(self, path: Path) -> None:
+        with path.open(encoding="utf-8", errors="replace") as handle:
+            handle.seek(0, os.SEEK_END)
+            while not self._stop_event.is_set():
+                line = handle.readline()
+                if not line:
+                    self._stop_event.wait(1.0)
+                    if _latest_server_log() != path:
+                        return
+                    continue
+                rate = parse_timing_line(line)
+                if rate is not None:
+                    self._state.record_live_rate(rate)
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+            self._thread = None
 
 
 def _stats_from_conversation(data: Any) -> dict[str, int | float] | None:

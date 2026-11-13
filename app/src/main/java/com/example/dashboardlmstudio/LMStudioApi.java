@@ -35,6 +35,8 @@ public class LMStudioApi {
         private Double gpuUsage;
         private Long gpuMemoryUsedMB;
         private Long gpuMemoryTotalMB;
+        private Double liveTokensPerSecond;
+        private String liveTokensPerSecondAt;
         private long promptTokens;
         private long completionTokens;
         private int errorCount;
@@ -46,6 +48,8 @@ public class LMStudioApi {
         public Double getGpuUsage() { return gpuUsage; }
         public Long getGpuMemoryUsedMB() { return gpuMemoryUsedMB; }
         public Long getGpuMemoryTotalMB() { return gpuMemoryTotalMB; }
+        public Double getLiveTokensPerSecond() { return liveTokensPerSecond; }
+        public String getLiveTokensPerSecondAt() { return liveTokensPerSecondAt; }
         public long getPromptTokens() { return promptTokens; }
         public long getCompletionTokens() { return completionTokens; }
         public int getErrorCount() { return errorCount; }

@@ -33,7 +33,7 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 
 The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM Studio itself does not implement those routes, which is why pointing the app directly to LM Studio produces an unexpected-endpoint response. The bridge proxies LM Studio's model/inference API and supplies the dashboard's metrics routes. Its source and run instructions are in `companion-metrics-server/` in this repository.
 
-Token metrics come from two sources. The bridge listens to LM Studio's live inference diagnostics (`lms log stream`), so predictions made in the LM Studio desktop app are captured while the bridge is running; and at startup the bridge seeds the dashboard from the most recent prediction stored in LM Studio's local conversation history, so the last prediction is visible even when the bridge was started afterwards. Inferences routed through the bridge are measured directly, and streaming requests get `stream_options.include_usage` added so they are measured too. The `logMonitor` field in `/api/v1/metrics` reports whether the live listener is `running`, `retrying`, `unavailable`, or `disabled`. Plain HTTP is used for this local-network setup; do not expose it to public networks.
+Token metrics come from two sources. The bridge listens to LM Studio's live inference diagnostics (`lms log stream`), so predictions made in the LM Studio desktop app are captured while the bridge is running; and at startup the bridge seeds the dashboard from the most recent prediction stored in LM Studio's local conversation history, so the last prediction is visible even when the bridge was started afterwards. Inferences routed through the bridge are measured directly, and streaming requests get `stream_options.include_usage` added so they are measured too. LM Studio only reports final token stats when a response finishes, so the bridge also tails LM Studio's server logs for `tg = X t/s` timing lines and exposes `liveTokensPerSecond`; the app shows that live value while a response is being generated, provided the runtime log verbosity includes those lines. The `logMonitor` field in `/api/v1/metrics` reports whether the live listener is `running`, `retrying`, `unavailable`, or `disabled`. Plain HTTP is used for this local-network setup; do not expose it to public networks.
 
 ### PC requirements
 
@@ -139,7 +139,7 @@ A production release will require a persistent release keystore and GitHub Actio
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Connection check |
-| `GET /api/v1/metrics` | CPU, memory, token speed, error metrics, and `logMonitor` status |
+| `GET /api/v1/metrics` | CPU, memory, token speed, error metrics, `logMonitor`, `lastUsageAt`, and `liveTokensPerSecond` |
 | `GET /v1/models` | Model list endpoint declared by the client |
 | `GET /api/v1/errors` | Error list endpoint declared by the client |
 

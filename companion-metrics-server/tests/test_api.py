@@ -13,7 +13,9 @@ from metrics_server.app import (
 )
 from metrics_server.lms_log import (
     _stats_from_conversation,
+    parse_lms_log_event,
     parse_lms_log_usage,
+    parse_timing_line,
     seed_state_from_history,
 )
 from metrics_server.state import MetricsState
@@ -66,6 +68,9 @@ def test_metrics_match_android_app_contract():
         "errorCount": 0,
         "errors": [],
         "logMonitor": "disabled",
+        "lastUsageAt": None,
+        "liveTokensPerSecond": None,
+        "liveTokensPerSecondAt": None,
     }
 
 
@@ -414,6 +419,68 @@ def test_stats_from_conversation_returns_latest_prediction():
         "completion_tokens": 4,
         "tokens_per_second": 20.0,
     }
+
+
+def test_parse_lms_log_event_distinguishes_input_and_output():
+    input_event = parse_lms_log_event(
+        json.dumps({"data": {"type": "llm.prediction.input", "input": "hi"}})
+    )
+    assert input_event == ("llm.prediction.input", None)
+
+    output_event = parse_lms_log_event(
+        json.dumps(
+            {
+                "data": {
+                    "type": "llm.prediction.output",
+                    "stats": {
+                        "tokensPerSecond": 12.5,
+                        "promptTokensCount": 5,
+                        "predictedTokensCount": 3,
+                    },
+                }
+            }
+        )
+    )
+    assert output_event == (
+        "llm.prediction.output",
+        {"prompt_tokens": 5, "completion_tokens": 3, "tokens_per_second": 12.5},
+    )
+
+
+def test_record_usage_stamps_last_usage_at():
+    state = MetricsState()
+    assert state.snapshot(cpu_usage=0, memory_used_mb=0)["lastUsageAt"] is None
+
+    state.record_usage(
+        prompt_tokens=5,
+        completion_tokens=3,
+        elapsed_seconds=0.0,
+        tokens_per_second=12.5,
+        source="diagnostics",
+    )
+
+    assert state.snapshot(cpu_usage=0, memory_used_mb=0)["lastUsageAt"] is not None
+
+
+def test_parse_timing_line_reads_live_generation_rate():
+    assert parse_timing_line(
+        "[DEBUG] slot print_timing: id  3 | task 2902 | n_gen =    564, tg =   2.51 t/s, tg_3s =   2.71 t/s"
+    ) == 2.51
+    assert parse_timing_line(
+        "[DEBUG] slot print_timing: id  0 | task 12 |        eval time =    3980.65 ms /    17 tokens (  248.79 ms per token,     4.02 tokens per second)"
+    ) == 4.02
+    assert parse_timing_line("[INFO] some unrelated log line") is None
+
+
+def test_record_live_rate_exposes_live_tokens_per_second():
+    state = MetricsState()
+    assert state.snapshot(cpu_usage=0, memory_used_mb=0)["liveTokensPerSecond"] is None
+
+    state.record_live_rate(7.5)
+
+    snapshot = state.snapshot(cpu_usage=0, memory_used_mb=0)
+    assert snapshot["liveTokensPerSecond"] == 7.5
+    assert snapshot["liveTokensPerSecondAt"] is not None
 
 
 def test_diagnostics_rate_wins_over_proxy_wall_clock_rate():

@@ -49,6 +49,19 @@ public class DashboardViewModel extends AndroidViewModel {
     public LiveData<List<ErrorLogEntry>> getErrors() { return errors; }
     public LiveData<String> getErrorMessage() { return errorMessage; }
 
+    private static boolean isFresh(String isoTimestamp, long maxAgeMs) {
+        if (isoTimestamp == null || isoTimestamp.isEmpty()) {
+            return false;
+        }
+        try {
+            java.time.OffsetDateTime time = java.time.OffsetDateTime.parse(isoTimestamp);
+            long age = java.time.Duration.between(time, java.time.OffsetDateTime.now()).toMillis();
+            return age >= 0 && age <= maxAgeMs;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public void connect(String url) {
         stopMonitoring();
         if (apiClient != null) {
@@ -105,7 +118,12 @@ public class DashboardViewModel extends AndroidViewModel {
                 if (metrics != null) {
                     cpuUsage.postValue(String.valueOf(metrics.getCpuUsage()));
                     memoryUsage.postValue(String.valueOf(metrics.getMemoryUsedMB()));
-                    tokenPerSecond.postValue(String.valueOf(metrics.getTokenPerSecond()));
+                    Double liveTps = metrics.getLiveTokensPerSecond();
+                    if (liveTps != null && isFresh(metrics.getLiveTokensPerSecondAt(), 10_000L)) {
+                        tokenPerSecond.postValue(String.valueOf(liveTps));
+                    } else {
+                        tokenPerSecond.postValue(String.valueOf(metrics.getTokenPerSecond()));
+                    }
 
                     Double gpuUsage = metrics.getGpuUsage();
                     if (gpuUsage == null) {

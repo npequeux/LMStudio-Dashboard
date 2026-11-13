@@ -14,6 +14,9 @@ class MetricsState:
         # Usage records keyed by source. Diagnostics come from LM Studio's own
         # measurement; proxy values are a wall-clock fallback.
         self._usage: dict[str, tuple[int, int, float]] = {}
+        self._last_usage_at: str | None = None
+        self._live_tokens_per_second: float | None = None
+        self._live_tokens_per_second_at: str | None = None
 
     def record_usage(
         self,
@@ -37,6 +40,13 @@ class MetricsState:
                 int(completion_tokens),
                 max(0.0, float(tokens_per_second)),
             )
+            self._last_usage_at = datetime.now(timezone.utc).isoformat()
+
+    def record_live_rate(self, tokens_per_second: float) -> None:
+        """Record a live generation rate read from LM Studio's server logs."""
+        with self._lock:
+            self._live_tokens_per_second = max(0.0, float(tokens_per_second))
+            self._live_tokens_per_second_at = datetime.now(timezone.utc).isoformat()
 
     def _preferred_usage(self) -> tuple[int, int, float]:
         """Caller must hold the lock. Prefer the measured diagnostics rate."""
@@ -70,6 +80,9 @@ class MetricsState:
         with self._lock:
             errors = list(self._errors)
             prompt_tokens, completion_tokens, token_per_second = self._preferred_usage()
+            last_usage_at = self._last_usage_at
+            live_tokens_per_second = self._live_tokens_per_second
+            live_tokens_per_second_at = self._live_tokens_per_second_at
         return {
             "cpuUsage": round(float(cpu_usage), 1),
             "memoryUsedMB": int(memory_used_mb),
@@ -81,6 +94,9 @@ class MetricsState:
             "completionTokens": completion_tokens,
             "errorCount": len(errors),
             "errors": errors,
+            "lastUsageAt": last_usage_at,
+            "liveTokensPerSecond": live_tokens_per_second,
+            "liveTokensPerSecondAt": live_tokens_per_second_at,
         }
 
     def errors(self) -> list[dict[str, str]]:

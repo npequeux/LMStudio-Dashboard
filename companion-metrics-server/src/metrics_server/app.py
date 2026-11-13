@@ -20,7 +20,7 @@ import psutil
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from metrics_server.lms_log import LmsLogMonitor, seed_state_from_history
+from metrics_server.lms_log import LmsLogMonitor, ServerLogMonitor, seed_state_from_history
 from metrics_server.state import MetricsState
 
 logger = logging.getLogger(__name__)
@@ -253,6 +253,7 @@ def create_app(
     state = state or MetricsState()
     metrics_provider = metrics_provider or collect_system_metrics
     log_monitor = LmsLogMonitor(state, enabled=enable_lms_log_stream)
+    server_log_monitor = ServerLogMonitor(state)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -260,10 +261,12 @@ def create_app(
         await asyncio.to_thread(psutil.cpu_percent, None)
         seed_state_from_history(state, reader=history_reader)
         log_monitor.start()
+        server_log_monitor.start()
         logger.info("LM Studio log monitor status: %s", log_monitor.status)
         try:
             yield
         finally:
+            server_log_monitor.stop()
             log_monitor.stop()
 
     app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="0.2.0", lifespan=lifespan)
