@@ -21,6 +21,7 @@ def make_client(handler, *, state=None, metrics_provider=None):
         state=state,
         metrics_provider=metrics_provider,
         transport=transport,
+        enable_lms_log_stream=False,
     )
     return TestClient(app)
 
@@ -127,7 +128,11 @@ def test_models_proxy_accepts_lm_studio_v1_base_url():
         assert request.url.path == "/v1/models"
         return httpx.Response(200, json={"data": []})
 
-    app = create_app(Settings(lm_studio_url="http://192.168.129.35:1234/v1"), transport=httpx.MockTransport(handler))
+    app = create_app(
+        Settings(lm_studio_url="http://192.168.129.35:1234/v1"),
+        transport=httpx.MockTransport(handler),
+        enable_lms_log_stream=False,
+    )
     with TestClient(app) as client:
         response = client.get("/v1/models")
 

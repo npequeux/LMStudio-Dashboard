@@ -21,6 +21,8 @@ public class DashboardViewModel extends AndroidViewModel {
     private final MutableLiveData<String> cpuUsage = new MutableLiveData<>("0");
     private final MutableLiveData<String> memoryUsage = new MutableLiveData<>("0");
     private final MutableLiveData<String> tokenPerSecond = new MutableLiveData<>("0");
+    private final MutableLiveData<String> gpuSummary = new MutableLiveData<>("N/A");
+    private final MutableLiveData<String> promptCompletionTokens = new MutableLiveData<>("0 / 0");
     private final MutableLiveData<Integer> errorCount = new MutableLiveData<>(0);
     private final MutableLiveData<List<ErrorLogEntry>> errors = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<String> errorMessage = new MutableLiveData<>();
@@ -37,6 +39,8 @@ public class DashboardViewModel extends AndroidViewModel {
     public LiveData<String> getCpuUsage() { return cpuUsage; }
     public LiveData<String> getMemoryUsage() { return memoryUsage; }
     public LiveData<String> getTokenPerSecond() { return tokenPerSecond; }
+    public LiveData<String> getGpuSummary() { return gpuSummary; }
+    public LiveData<String> getPromptCompletionTokens() { return promptCompletionTokens; }
     public LiveData<Integer> getErrorCount() { return errorCount; }
     public LiveData<List<ErrorLogEntry>> getErrors() { return errors; }
     public LiveData<String> getErrorMessage() { return errorMessage; }
@@ -81,12 +85,25 @@ public class DashboardViewModel extends AndroidViewModel {
                     memoryUsage.postValue(String.valueOf(metrics.getMemoryUsedMB()));
                     tokenPerSecond.postValue(String.valueOf(metrics.getTokenPerSecond()));
 
-                    if (metrics.getErrorCount() > 0) {
-                        errorCount.postValue(metrics.getErrorCount());
-                        List<ErrorLogEntry> newErrors = metrics.getErrors();
-                        if (newErrors != null && !newErrors.isEmpty()) {
-                            errors.postValue(newErrors);
+                    Double gpuUsage = metrics.getGpuUsage();
+                    if (gpuUsage == null) {
+                        gpuSummary.postValue("N/A");
+                    } else {
+                        String gpuText = String.format(java.util.Locale.US, "%.0f%%", gpuUsage);
+                        Long gpuMemoryUsed = metrics.getGpuMemoryUsedMB();
+                        Long gpuMemoryTotal = metrics.getGpuMemoryTotalMB();
+                        if (gpuMemoryUsed != null && gpuMemoryTotal != null) {
+                            gpuText += "\n" + gpuMemoryUsed + "/" + gpuMemoryTotal + " MB";
                         }
+                        gpuSummary.postValue(gpuText);
+                    }
+                    promptCompletionTokens.postValue(
+                            metrics.getPromptTokens() + " / " + metrics.getCompletionTokens());
+
+                    errorCount.postValue(metrics.getErrorCount());
+                    List<ErrorLogEntry> newErrors = metrics.getErrors();
+                    if (newErrors != null) {
+                        errors.postValue(newErrors);
                     }
                 }
             } catch (Exception e) {

@@ -31,8 +31,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupViews() {
         EditText serverUrlInput = findViewById(R.id.etServerUrl);
-        String savedServerUrl = getSharedPreferences("settings", MODE_PRIVATE)
-                .getString("server_url", getString(R.string.hint_server_url));
+        android.content.SharedPreferences preferences = getSharedPreferences("settings", MODE_PRIVATE);
+        String savedServerUrl = preferences.getString("server_url", null);
+        if (savedServerUrl == null || savedServerUrl.trim().isEmpty()
+                || savedServerUrl.contains(":1234") || savedServerUrl.endsWith("/v1")) {
+            savedServerUrl = getString(R.string.hint_server_url);
+            preferences.edit().putString("server_url", savedServerUrl).apply();
+        }
         serverUrlInput.setText(savedServerUrl);
 
         Button btnConnect = findViewById(R.id.btnConnect);
@@ -84,6 +89,16 @@ public class MainActivity extends AppCompatActivity {
         viewModel.getTokenPerSecond().observe(this, tokens -> {
             TextView tvTokens = findViewById(R.id.tvTokensValue);
             if (tvTokens != null) tvTokens.setText(tokens + "/s");
+        });
+
+        viewModel.getGpuSummary().observe(this, gpu -> {
+            TextView tvGpu = findViewById(R.id.tvGpuValue);
+            if (tvGpu != null) tvGpu.setText(gpu);
+        });
+
+        viewModel.getPromptCompletionTokens().observe(this, tokens -> {
+            TextView tvPromptTokens = findViewById(R.id.tvPromptCompletionTokensValue);
+            if (tvPromptTokens != null) tvPromptTokens.setText(tokens);
         });
 
         viewModel.getErrorCount().observe(this, count -> {
