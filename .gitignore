@@ -23,7 +23,6 @@ split_apks/
 # Android Studio generated files and caches
 .idea/
 *.iml
-.gradle/
 local.properties
 *.jks
 *.p12
@@ -54,9 +53,6 @@ build/
 out/
 target/
 */build/
-
-# Gradle wrapper - keep the script but ignore the jar
-gradle/wrapper/gradle-wrapper.jar
 
 # Android Profiling
 *.hprof
@@ -92,9 +88,6 @@ Thumbs.db
 *.ipr
 *.iml
 
-# Gradle daemon
-.gradle/
-
 # Android build outputs
 app/build/
 app/release/
@@ -108,10 +101,6 @@ app/bin/
 # Generated code (R class, BuildConfig)
 **/generated/**
 **/build/generated/**
-
-# Kotlin metadata
-*.kotlin_metadata
-*.kotlin_module
 
 # CMake cache files
 CMakeCache.txt
