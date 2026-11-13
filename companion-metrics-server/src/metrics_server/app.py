@@ -247,13 +247,14 @@ def create_app(
     metrics_provider: Callable[[], HostMetrics] | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
     enable_lms_log_stream: bool = True,
+    enable_server_log_monitor: bool = True,
     history_reader: Callable[[], dict[str, int | float] | None] | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     state = state or MetricsState()
     metrics_provider = metrics_provider or collect_system_metrics
     log_monitor = LmsLogMonitor(state, enabled=enable_lms_log_stream)
-    server_log_monitor = ServerLogMonitor(state)
+    server_log_monitor = ServerLogMonitor(state, enabled=enable_server_log_monitor)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -350,6 +351,8 @@ def create_app(
             gpu_memory_total_mb=host_metrics.gpu_memory_total_mb,
         )
         snapshot["logMonitor"] = log_monitor.status
+        snapshot["serverLogMonitor"] = server_log_monitor.status
+        snapshot["liveTimingLines"] = server_log_monitor.timing_lines
         return snapshot
 
     @app.get("/api/v1/errors")

@@ -284,9 +284,18 @@ class ServerLogMonitor:
         self._enabled = enabled
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+        self._status = "disabled" if not enabled else "stopped"
+        self.timing_lines = 0
+
+    @property
+    def status(self) -> str:
+        return self._status
 
     def start(self) -> bool:
-        if not self._enabled or self._thread is not None:
+        if not self._enabled:
+            self._status = "disabled"
+            return False
+        if self._thread is not None:
             return False
         self._stop_event.clear()
         self._thread = threading.Thread(
@@ -299,8 +308,10 @@ class ServerLogMonitor:
         while not self._stop_event.is_set():
             path = _latest_server_log()
             if path is None:
+                self._status = "waiting"
                 self._stop_event.wait(5.0)
                 continue
+            self._status = "running"
             try:
                 self._tail(path)
             except OSError as exc:
@@ -319,6 +330,7 @@ class ServerLogMonitor:
                     continue
                 rate = parse_timing_line(line)
                 if rate is not None:
+                    self.timing_lines += 1
                     self._state.record_live_rate(rate)
 
     def stop(self) -> None:
@@ -326,6 +338,7 @@ class ServerLogMonitor:
         if self._thread is not None:
             self._thread.join(timeout=5)
             self._thread = None
+        self._status = "stopped"
 
 
 def _stats_from_conversation(data: Any) -> dict[str, int | float] | None:

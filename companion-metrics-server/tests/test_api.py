@@ -30,6 +30,7 @@ def make_client(handler, *, state=None, metrics_provider=None):
         transport=transport,
         enable_lms_log_stream=False,
         history_reader=lambda: None,
+        enable_server_log_monitor=False,
     )
     return TestClient(app)
 
@@ -68,6 +69,8 @@ def test_metrics_match_android_app_contract():
         "errorCount": 0,
         "errors": [],
         "logMonitor": "disabled",
+        "serverLogMonitor": "disabled",
+        "liveTimingLines": 0,
         "lastUsageAt": None,
         "liveTokensPerSecond": None,
         "liveTokensPerSecondAt": None,
@@ -145,6 +148,7 @@ def test_models_proxy_accepts_lm_studio_v1_base_url():
         transport=httpx.MockTransport(handler),
         enable_lms_log_stream=False,
         history_reader=lambda: None,
+        enable_server_log_monitor=False,
     )
     with TestClient(app) as client:
         response = client.get("/v1/models")
@@ -162,6 +166,7 @@ def test_models_proxy_accepts_base_url_with_v1_suffix():
         transport=httpx.MockTransport(handler),
         enable_lms_log_stream=False,
         history_reader=lambda: None,
+        enable_server_log_monitor=False,
     )
     with TestClient(app) as client:
         response = client.get("/v1/models")
@@ -208,6 +213,7 @@ def test_native_lmstudio_v0_chat_records_prompt_and_native_stats():
         transport=httpx.MockTransport(handler),
         enable_lms_log_stream=False,
         history_reader=lambda: None,
+        enable_server_log_monitor=False,
     )
     with TestClient(app) as client:
         response = client.post("/api/v0/chat/completions", json={"model": "test-model", "messages": []})
@@ -528,6 +534,7 @@ def test_bridge_key_protects_metrics_when_configured():
         transport=httpx.MockTransport(handler),
         enable_lms_log_stream=False,
         history_reader=lambda: None,
+        enable_server_log_monitor=False,
         metrics_provider=lambda: HostMetrics(1.0, 2),
     )
     with TestClient(app) as client:
