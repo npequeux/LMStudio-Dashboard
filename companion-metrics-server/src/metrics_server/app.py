@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
+import hmac
 import importlib
 import json
 import logging
@@ -30,6 +32,7 @@ class Settings:
         default_factory=lambda: os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234/v1")
     )
     lm_studio_api_key: str | None = field(default_factory=lambda: os.getenv("LM_STUDIO_API_KEY"))
+    bridge_api_key: str | None = field(default_factory=lambda: os.getenv("BRIDGE_API_KEY"))
 
 
 @dataclass(frozen=True)
@@ -253,6 +256,8 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        # Establish the CPU baseline so the first dashboard reading is not 0.
+        await asyncio.to_thread(psutil.cpu_percent, None)
         seed_state_from_history(state, reader=history_reader)
         log_monitor.start()
         logger.info("LM Studio log monitor status: %s", log_monitor.status)
@@ -263,6 +268,20 @@ def create_app(
 
     app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="0.2.0", lifespan=lifespan)
     app.state.metrics_state = state
+
+    if settings.bridge_api_key:
+        expected_key = settings.bridge_api_key
+
+        @app.middleware("http")
+        async def require_bridge_key(request: Request, call_next):
+            # /health only reports liveness; every other route needs the key.
+            if request.url.path == "/health":
+                return await call_next(request)
+            auth = request.headers.get("authorization", "")
+            token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+            if not token or not hmac.compare_digest(token, expected_key):
+                return JSONResponse(status_code=401, content={"error": "unauthorized"})
+            return await call_next(request)
 
     def target_url(path: str) -> str:
         base_url = settings.lm_studio_url.rstrip("/")
@@ -315,7 +334,8 @@ def create_app(
     @app.get("/api/v1/metrics")
     async def metrics() -> dict[str, object]:
         try:
-            host_metrics = metrics_provider()
+            # Host counters can shell out to PowerShell; keep the event loop free.
+            host_metrics = await asyncio.to_thread(metrics_provider)
         except Exception as exc:  # keep metrics endpoint available if a host counter fails
             state.record_error(f"Could not read host metrics: {exc}", source="system")
             host_metrics = HostMetrics(cpu_usage=0.0, memory_used_mb=0)

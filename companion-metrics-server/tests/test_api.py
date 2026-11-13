@@ -414,3 +414,68 @@ def test_stats_from_conversation_returns_latest_prediction():
         "completion_tokens": 4,
         "tokens_per_second": 20.0,
     }
+
+
+def test_diagnostics_rate_wins_over_proxy_wall_clock_rate():
+    state = MetricsState()
+    state.record_usage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        elapsed_seconds=1.0,
+        tokens_per_second=42.0,
+        source="diagnostics",
+    )
+    state.record_usage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        elapsed_seconds=1.0,
+        tokens_per_second=2.0,
+        source="proxy",
+    )
+
+    snapshot = state.snapshot(cpu_usage=0, memory_used_mb=0)
+    assert snapshot["tokenPerSecond"] == 42.0
+    assert snapshot["promptTokens"] == 10
+    assert snapshot["completionTokens"] == 5
+
+
+def test_proxy_rate_used_when_diagnostics_missing():
+    state = MetricsState()
+    state.record_usage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        elapsed_seconds=1.0,
+        tokens_per_second=2.0,
+        source="proxy",
+    )
+
+    assert state.snapshot(cpu_usage=0, memory_used_mb=0)["tokenPerSecond"] == 2.0
+
+
+def test_bridge_key_protects_metrics_when_configured():
+    def handler(request):
+        raise AssertionError("metrics should not contact LM Studio")
+
+    app = create_app(
+        Settings(lm_studio_url="http://lm-studio.test", bridge_api_key="secret"),
+        transport=httpx.MockTransport(handler),
+        enable_lms_log_stream=False,
+        history_reader=lambda: None,
+        metrics_provider=lambda: HostMetrics(1.0, 2),
+    )
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/api/v1/metrics").status_code == 401
+        assert client.get("/api/v1/metrics", headers={"authorization": "Bearer wrong"}).status_code == 401
+
+        authorized = client.get("/api/v1/metrics", headers={"authorization": "Bearer secret"})
+        assert authorized.status_code == 200
+        assert authorized.json()["cpuUsage"] == 1.0
+
+
+def test_no_bridge_key_keeps_metrics_open():
+    def handler(request):
+        raise AssertionError("metrics should not contact LM Studio")
+
+    with make_client(handler, metrics_provider=lambda: HostMetrics(1.0, 2)) as client:
+        assert client.get("/api/v1/metrics").status_code == 200

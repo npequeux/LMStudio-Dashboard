@@ -1,6 +1,5 @@
 package com.example.dashboardlmstudio;
 
-import android.content.Context;
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
 import java.util.ArrayList;
@@ -13,6 +12,7 @@ public class LMStudioApi {
 
     private final String baseUrl;
     private final LMStudioService service;
+    private final OkHttpClient client;
 
     public interface LMStudioService {
         @retrofit2.http.GET("/v1/models")
@@ -62,18 +62,26 @@ public class LMStudioApi {
         public boolean isLoaded() { return loaded; }
     }
 
-    public LMStudioApi(String baseUrl, Context context) {
+    public LMStudioApi(String baseUrl, String apiKey) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
 
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
-        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BASIC);
 
-        OkHttpClient client = new OkHttpClient.Builder()
+        OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(10, TimeUnit.SECONDS)
-                .addInterceptor(loggingInterceptor)
-                .build();
+                .addInterceptor(loggingInterceptor);
+
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
+            builder.addInterceptor(chain -> chain.proceed(
+                    chain.request().newBuilder()
+                            .header("Authorization", "Bearer " + apiKey.trim())
+                            .build()));
+        }
+
+        this.client = builder.build();
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(this.baseUrl + "/")
@@ -82,6 +90,12 @@ public class LMStudioApi {
                 .build();
 
         this.service = retrofit.create(LMStudioService.class);
+    }
+
+    /** Release the underlying OkHttp threads and connections. */
+    public void close() {
+        client.dispatcher().executorService().shutdown();
+        client.connectionPool().evictAll();
     }
 
     public boolean testConnection() {

@@ -12,7 +12,6 @@ on:
 env:
   APP_NAME: DashboardLMStudio
   JAVA_VERSION: '17'
-  GRADLE_WRAPPER_VERSION: '8.4'
 
 jobs:
   build:
@@ -75,9 +74,28 @@ jobs:
           name: lint-results
           path: app/build/reports/lint-results.html
 
+  python-tests:
+    name: Python bridge tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install bridge dependencies
+        run: uv sync --extra test
+        working-directory: companion-metrics-server
+
+      - name: Run bridge tests
+        run: uv run pytest -q
+        working-directory: companion-metrics-server
+
   release:
     name: Release APK (${{ github.event_name }})
-    needs: build
+    needs: [build, python-tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write

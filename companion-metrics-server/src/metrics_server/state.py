@@ -11,9 +11,9 @@ class MetricsState:
     def __init__(self, max_errors: int = 100) -> None:
         self._lock = threading.Lock()
         self._errors: deque[dict[str, str]] = deque(maxlen=max_errors)
-        self._token_per_second = 0.0
-        self._prompt_tokens = 0
-        self._completion_tokens = 0
+        # Usage records keyed by source. Diagnostics come from LM Studio's own
+        # measurement; proxy values are a wall-clock fallback.
+        self._usage: dict[str, tuple[int, int, float]] = {}
 
     def record_usage(
         self,
@@ -21,6 +21,7 @@ class MetricsState:
         completion_tokens: int,
         elapsed_seconds: float,
         tokens_per_second: float | None = None,
+        source: str = "proxy",
     ) -> None:
         if prompt_tokens < 0 or completion_tokens < 0:
             return
@@ -31,9 +32,18 @@ class MetricsState:
                 else 0.0
             )
         with self._lock:
-            self._prompt_tokens = prompt_tokens
-            self._completion_tokens = completion_tokens
-            self._token_per_second = max(0.0, float(tokens_per_second))
+            self._usage[source] = (
+                int(prompt_tokens),
+                int(completion_tokens),
+                max(0.0, float(tokens_per_second)),
+            )
+
+    def _preferred_usage(self) -> tuple[int, int, float]:
+        """Caller must hold the lock. Prefer the measured diagnostics rate."""
+        for source in ("diagnostics", "proxy"):
+            if source in self._usage:
+                return self._usage[source]
+        return (0, 0, 0.0)
 
     def record_error(self, message: str, source: str = "LM Studio") -> None:
         entry = {
@@ -47,11 +57,7 @@ class MetricsState:
 
     def has_usage(self) -> bool:
         with self._lock:
-            return (
-                self._token_per_second != 0.0
-                or self._prompt_tokens != 0
-                or self._completion_tokens != 0
-            )
+            return bool(self._usage)
 
     def snapshot(
         self,
@@ -63,9 +69,7 @@ class MetricsState:
     ) -> dict[str, object]:
         with self._lock:
             errors = list(self._errors)
-            token_per_second = self._token_per_second
-            prompt_tokens = self._prompt_tokens
-            completion_tokens = self._completion_tokens
+            prompt_tokens, completion_tokens, token_per_second = self._preferred_usage()
         return {
             "cpuUsage": round(float(cpu_usage), 1),
             "memoryUsedMB": int(memory_used_mb),

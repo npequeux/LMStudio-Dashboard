@@ -4,8 +4,8 @@
     <color name="metric_memory">#2196F3</color>
     <color name="metric_tokens">#4CAF50</color>
     <color name="metric_errors">#F44336</color>
-    <color name="metric_connections">#FF9800</color>
-    <color name="metric_requests">#9C27B0</color>
+    <color name="metric_gpu">#9C27B0</color>
+    <color name="metric_prompt">#03A9F4</color>
     <color name="status_online">#4CAF50</color>
     <color name="status_offline">#F44336</color>
     <color name="bg_dark">#121212</color>

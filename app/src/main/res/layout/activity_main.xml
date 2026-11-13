@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#121212"
+    android:background="@color/bg_dark">
     android:padding="16dp">
 
     <!-- Header -->
@@ -27,7 +27,7 @@
             android:text="LM Studio Monitor"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:textColor="#FFFFFF"/>
+            android:textColor="@color/text_primary"/>
 
         <TextView
             android:id="@+id/tvConnectionStatus"
@@ -35,7 +35,7 @@
             android:layout_height="wrap_content"
             android:text="Disconnected"
             android:textSize="14sp"
-            android:textColor="#F44336"/>
+            android:textColor="@color/metric_errors"/>
 
         <ProgressBar
             android:id="@+id/progressBar"
@@ -57,26 +57,61 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="http://192.168.129.35:8000"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#B0B0B0"/>
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"/>
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Connect Button -->
-    <Button
-        android:id="@+id/btnConnect"
+    <!-- Optional bridge API key -->
+    <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="CONNECT"
-        android:layout_marginTop="8dp"/>
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_marginTop="8dp">
+
+        <EditText
+            android:id="@+id/etApiKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Bridge API key (optional)"
+            android:inputType="textPassword"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"/>
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Connect / Disconnect -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/btn_connect"/>
+
+        <Button
+            android:id="@+id/btnDisconnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/btn_disconnect"
+            android:enabled="false"/>
+
+    </LinearLayout>
 
     <!-- Start/Stop Monitoring Button -->
     <Button
         android:id="@+id/btnStartMonitoring"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="START MONITORING"
-        android:backgroundTint="#4CAF50"
+        android:text="@string/btn_start_monitoring"
+        android:backgroundTint="@color/metric_tokens"
         android:layout_marginTop="8dp"/>
 
     <!-- Metrics Grid -->
@@ -110,7 +145,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="CPU Usage"
-                    android:textColor="#B0B0B0"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
 
@@ -121,7 +156,7 @@
                     android:text="0%"
                     android:textSize="32sp"
                     android:textStyle="bold"
-                    android:textColor="#FF5722"/>
+                    android:textColor="@color/metric_cpu"/>
 
             </LinearLayout>
 
@@ -150,7 +185,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Memory Usage"
-                    android:textColor="#B0B0B0"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
 
@@ -161,7 +196,7 @@
                     android:text="0 MB"
                     android:textSize="32sp"
                     android:textStyle="bold"
-                    android:textColor="#2196F3"/>
+                    android:textColor="@color/metric_memory"/>
 
             </LinearLayout>
 
@@ -190,7 +225,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Tokens/sec"
-                    android:textColor="#B0B0B0"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
 
@@ -201,7 +236,7 @@
                     android:text="0/s"
                     android:textSize="32sp"
                     android:textStyle="bold"
-                    android:textColor="#4CAF50"/>
+                    android:textColor="@color/metric_tokens"/>
 
             </LinearLayout>
 
@@ -225,7 +260,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="GPU Usage / VRAM"
-                    android:textColor="#B0B0B0"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp"/>
 
                 <TextView
@@ -235,7 +270,7 @@
                     android:text="N/A"
                     android:textSize="24sp"
                     android:textStyle="bold"
-                    android:textColor="#9C27B0"/>
+                    android:textColor="@color/metric_gpu"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -257,7 +292,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Prompt / Completion Tokens"
-                    android:textColor="#B0B0B0"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp"/>
 
                 <TextView
@@ -267,7 +302,7 @@
                     android:text="0 / 0"
                     android:textSize="24sp"
                     android:textStyle="bold"
-                    android:textColor="#03A9F4"/>
+                    android:textColor="@color/metric_prompt"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -294,7 +329,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Errors"
-                    android:textColor="#B0B0B0"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
 
@@ -305,7 +340,7 @@
                     android:text="0"
                     android:textSize="32sp"
                     android:textStyle="bold"
-                    android:textColor="#F44336"/>
+                    android:textColor="@color/metric_errors"/>
 
             </LinearLayout>
 
@@ -320,7 +355,7 @@
         android:text="Error Log"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/text_primary"
         android:layout_marginTop="16dp"/>
 
     <androidx.recyclerview.widget.RecyclerView

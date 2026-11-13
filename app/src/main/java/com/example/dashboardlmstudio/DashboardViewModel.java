@@ -1,14 +1,14 @@
 package com.example.dashboardlmstudio;
 
 import android.app.Application;
+import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
-import androidx.lifecycle.Transformations;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -27,15 +27,19 @@ public class DashboardViewModel extends AndroidViewModel {
     private final MutableLiveData<List<ErrorLogEntry>> errors = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<String> errorMessage = new MutableLiveData<>();
 
+    private final MutableLiveData<Boolean> monitoring = new MutableLiveData<>(false);
     private ScheduledExecutorService scheduler;
+    private ExecutorService connectExecutor;
     private LMStudioApi apiClient;
     private String serverUrl;
 
     public DashboardViewModel(@NonNull Application application) {
         super(application);
+        connectExecutor = Executors.newSingleThreadExecutor();
     }
 
     public LiveData<ConnectionState> getConnectionStatus() { return connectionStatus; }
+    public LiveData<Boolean> getMonitoring() { return monitoring; }
     public LiveData<String> getCpuUsage() { return cpuUsage; }
     public LiveData<String> getMemoryUsage() { return memoryUsage; }
     public LiveData<String> getTokenPerSecond() { return tokenPerSecond; }
@@ -46,12 +50,20 @@ public class DashboardViewModel extends AndroidViewModel {
     public LiveData<String> getErrorMessage() { return errorMessage; }
 
     public void connect(String url) {
+        stopMonitoring();
+        if (apiClient != null) {
+            apiClient.close();
+            apiClient = null;
+        }
         this.serverUrl = url;
         connectionStatus.setValue(ConnectionState.CONNECTING);
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        String apiKey = getApplication().getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getString("bridge_api_key", null);
+
+        connectExecutor.execute(() -> {
             try {
-                apiClient = new LMStudioApi(url, getApplication());
+                apiClient = new LMStudioApi(url, apiKey);
                 boolean connected = apiClient.testConnection();
 
                 if (connected) {
@@ -65,6 +77,16 @@ public class DashboardViewModel extends AndroidViewModel {
                 connectionStatus.postValue(ConnectionState.DISCONNECTED);
             }
         });
+    }
+
+    public void disconnect() {
+        stopMonitoring();
+        if (apiClient != null) {
+            apiClient.close();
+        }
+        apiClient = null;
+        serverUrl = null;
+        connectionStatus.postValue(ConnectionState.DISCONNECTED);
     }
 
     public void startMonitoring(long intervalMs) {
@@ -110,6 +132,7 @@ public class DashboardViewModel extends AndroidViewModel {
                 errorMessage.postValue("Monitor error: " + e.getMessage());
             }
         }, 0, intervalMs, TimeUnit.MILLISECONDS);
+        monitoring.postValue(true);
     }
 
     public void stopMonitoring() {
@@ -117,11 +140,16 @@ public class DashboardViewModel extends AndroidViewModel {
             scheduler.shutdown();
             scheduler = null;
         }
+        monitoring.postValue(false);
     }
 
     @Override
     protected void onCleared() {
         super.onCleared();
         stopMonitoring();
+        if (apiClient != null) {
+            apiClient.close();
+        }
+        connectExecutor.shutdown();
     }
 }

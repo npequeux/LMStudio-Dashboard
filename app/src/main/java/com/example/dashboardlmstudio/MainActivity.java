@@ -2,6 +2,7 @@ package com.example.dashboardlmstudio;
 
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -17,6 +18,11 @@ public class MainActivity extends AppCompatActivity {
     private DashboardViewModel viewModel;
     private ErrorLogAdapter errorLogAdapter;
     private RecyclerView errorRecyclerView;
+    private TextView tvConnectionStatus;
+    private Button btnConnect;
+    private Button btnDisconnect;
+    private Button btnStartMonitoring;
+    private ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupViews() {
         EditText serverUrlInput = findViewById(R.id.etServerUrl);
+        EditText apiKeyInput = findViewById(R.id.etApiKey);
         android.content.SharedPreferences preferences = getSharedPreferences("settings", MODE_PRIVATE);
         String savedServerUrl = preferences.getString("server_url", null);
         if (savedServerUrl == null || savedServerUrl.trim().isEmpty()
@@ -39,11 +46,13 @@ public class MainActivity extends AppCompatActivity {
             preferences.edit().putString("server_url", savedServerUrl).apply();
         }
         serverUrlInput.setText(savedServerUrl);
+        apiKeyInput.setText(preferences.getString("bridge_api_key", ""));
 
-        Button btnConnect = findViewById(R.id.btnConnect);
-        Button btnStartMonitoring = findViewById(R.id.btnStartMonitoring);
-        ProgressBar progressBar = findViewById(R.id.progressBar);
-        TextView tvStatus = findViewById(R.id.tvConnectionStatus);
+        btnConnect = findViewById(R.id.btnConnect);
+        btnDisconnect = findViewById(R.id.btnDisconnect);
+        btnStartMonitoring = findViewById(R.id.btnStartMonitoring);
+        progressBar = findViewById(R.id.progressBar);
+        tvConnectionStatus = findViewById(R.id.tvConnectionStatus);
 
         // Setup error log RecyclerView
         errorRecyclerView = findViewById(R.id.recyclerViewErrors);
@@ -66,12 +75,20 @@ public class MainActivity extends AppCompatActivity {
             getSharedPreferences("settings", MODE_PRIVATE)
                     .edit()
                     .putString("server_url", url)
+                    .putString("bridge_api_key", apiKeyInput.getText().toString().trim())
                     .apply();
             viewModel.connect(url);
         });
 
+        btnDisconnect.setOnClickListener(v -> viewModel.disconnect());
+
         btnStartMonitoring.setOnClickListener(v -> {
-            viewModel.startMonitoring(5000); // 5 second interval
+            Boolean monitoring = viewModel.getMonitoring().getValue();
+            if (monitoring != null && monitoring) {
+                viewModel.stopMonitoring();
+            } else {
+                viewModel.startMonitoring(5000); // 5 second interval
+            }
         });
     }
 
@@ -107,24 +124,31 @@ public class MainActivity extends AppCompatActivity {
         });
 
         viewModel.getConnectionStatus().observe(this, status -> {
-            TextView tvStatus = findViewById(R.id.tvConnectionStatus);
-            Button btnConnect = findViewById(R.id.btnConnect);
-            ProgressBar progressBar = findViewById(R.id.progressBar);
-
             if (status == DashboardViewModel.ConnectionState.CONNECTED) {
-                tvStatus.setText("Connected");
-                tvStatus.setTextColor(getResources().getColor(android.R.color.holo_green_light));
+                tvConnectionStatus.setText("Connected");
+                tvConnectionStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_light));
                 btnConnect.setEnabled(false);
+                btnDisconnect.setEnabled(true);
                 progressBar.setVisibility(View.GONE);
             } else if (status == DashboardViewModel.ConnectionState.DISCONNECTED) {
-                tvStatus.setText("Disconnected");
-                tvStatus.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+                tvConnectionStatus.setText("Disconnected");
+                tvConnectionStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
                 btnConnect.setEnabled(true);
+                btnDisconnect.setEnabled(false);
                 progressBar.setVisibility(View.GONE);
             } else if (status == DashboardViewModel.ConnectionState.CONNECTING) {
-                tvStatus.setText("Connecting...");
-                tvStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+                tvConnectionStatus.setText("Connecting...");
+                tvConnectionStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_orange_dark));
+                btnDisconnect.setEnabled(true);
                 progressBar.setVisibility(View.VISIBLE);
+            }
+        });
+
+        viewModel.getMonitoring().observe(this, monitoring -> {
+            if (monitoring != null && monitoring) {
+                btnStartMonitoring.setText(R.string.btn_stop_monitoring);
+            } else {
+                btnStartMonitoring.setText(R.string.btn_start_monitoring);
             }
         });
 

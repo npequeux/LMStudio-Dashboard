@@ -198,6 +198,7 @@ class LmsLogMonitor:
                     if "tokens_per_second" in usage
                     else 0.0
                 ),
+                source="diagnostics",
             )
 
     def stop(self) -> None:
@@ -312,6 +313,7 @@ def seed_state_from_history(
         tokens_per_second=(
             float(stats["tokens_per_second"]) if "tokens_per_second" in stats else None
         ),
+        source="diagnostics",
     )
     logger.info(
         "Seeded token metrics from the last LM Studio prediction: "

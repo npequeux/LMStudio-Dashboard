@@ -27,8 +27,9 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 
 1. Start the companion metrics bridge on the PC and make it reachable from the phone. Keep the PC and phone on the same trusted network, and allow TCP port 8000 through the PC firewall for Private networks.
 2. The server URL is prefilled as `http://192.168.129.35:8000`; change it if the PC's LAN IP differs. The app remembers the URL after you connect.
-3. Tap **Connect**, then **Start Monitoring** after the connection succeeds. Metrics refresh every five seconds.
-4. View CPU, memory, token-speed, and error metrics returned by the bridge.
+3. Tap **Connect**, then **Start Monitoring** after the connection succeeds. Metrics refresh every five seconds. Use **Stop Monitoring** to pause polling and **Disconnect** to release the connection.
+4. If the bridge sets `BRIDGE_API_KEY`, enter the same key in the **Bridge API key** field before connecting.
+5. View CPU, memory, GPU, token-speed, prompt/completion, and error metrics returned by the bridge.
 
 The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM Studio itself does not implement those routes, which is why pointing the app directly to LM Studio produces an unexpected-endpoint response. The bridge proxies LM Studio's model/inference API and supplies the dashboard's metrics routes. Its source and run instructions are in `companion-metrics-server/` in this repository.
 
@@ -68,9 +69,10 @@ Token metrics come from two sources. The bridge listens to LM Studio's live infe
 If using Python/pip instead of uv, from the companion folder run `py -m venv .venv`, then `.\.venv\Scripts\python -m pip install -e .`, and launch with `.\.venv\Scripts\python -m uvicorn metrics_server.app:app --host 0.0.0.0 --port 8000`.
 
 ## Features
-- Live CPU, memory, and token-speed metric cards
+- Live CPU, memory, GPU, token-speed, and prompt/completion metric cards
 - Error count and error log display
-- Connection to a server by base URL
+- Connection to a bridge by base URL, with optional bearer API key
+- Start/stop monitoring and disconnect controls
 - Five-second dashboard refresh
 
 ## Architecture
@@ -88,11 +90,18 @@ If using Python/pip instead of uv, from the companion folder run `py -m venv .ve
               │ Retrofit + OkHttp
               ▼
 ┌─────────────────────────────────────────┐
-│          LM Studio REST API             │
-│  GET /v1/models                         │
-│  GET /api/v1/metrics                    │
-│  GET /api/v1/errors                     │
+│        Metrics bridge (FastAPI)          │
 │  GET /health                            │
+│  GET /api/v1/metrics  (logMonitor)      │
+│  GET /api/v1/errors                     │
+│  POST /v1/chat/completions  (proxy)     │
+└─────────────────────────────────────────┘
+              │ httpx
+              ▼
+┌─────────────────────────────────────────┐
+│            LM Studio API                 │
+│  GET /v1/models                         │
+│  POST /v1/chat/completions              │
 └─────────────────────────────────────────┘
 ```
 
@@ -122,9 +131,8 @@ A production release will require a persistent release keystore and GitHub Actio
 
 ## CI builds
 
-- [Build workflow](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) builds the debug APK on pushes and pull requests.
-- Pushes to `main` and `v*` tags create a GitHub Release with `app-debug.apk`.
-- The Maven/GitHub Packages publication is paused while releases use the temporary debug-signing setup.
+- [Build workflow](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) builds the debug APK and runs the Android and Python bridge tests on pushes and pull requests.
+- Pushes to `main` and `v*` tags create a GitHub Release with `app-debug.apk` and the companion metrics server ZIP.
 
 ## API endpoints
 
@@ -140,8 +148,8 @@ The monitoring screen currently requests `/health` and `/api/v1/metrics`. The mo
 ## Dependencies
 - **Retrofit 2.9** - REST API client
 - **OkHttp 4.12** - HTTP client with logging interceptor
-- **MPAndroidChart v3.1** - Chart visualization library
-- **Kotlin Coroutines** - Async operations
+- **Gson** - JSON parsing
+- **AndroidX Lifecycle** - ViewModel/LiveData
 - **Material Components** - UI components
 
 ## License
