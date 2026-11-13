@@ -11,7 +11,6 @@ on:
 
 env:
   APP_NAME: DashboardLMStudio
-  JAVA_VERSION: '17'
 
 jobs:
   build:
@@ -22,57 +21,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '${{ env.JAVA_VERSION }}'
+          java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
 
-      - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --no-daemon
+      - name: Install Android SDK platforms
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui-android
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: dotnet build -f net10.0-android -c Release app/DashboardLMStudio.csproj
 
       - name: Upload Debug Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/bin/Release/net10.0-android/com.example.dashboardlmstudio-Signed.apk
           retention-days: 30
-
-  lint-check:
-    name: Lint & Static Analysis
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: '${{ env.JAVA_VERSION }}'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Run lint check
-        run: ./gradlew lint --no-daemon
-
-      - name: Upload lint results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-results
-          path: app/build/reports/lint-results.html
 
   python-tests:
     name: Python bridge tests
@@ -122,22 +99,21 @@ jobs:
           RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}
         run: |
           TAG_NAME="$RELEASE_TAG"
-          RELEASE_NAME="Release $TAG_NAME (temporary debug build)"
+          RELEASE_NAME="Release $TAG_NAME (debug build)"
           printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
-            "## Temporary debug release" \
+            "## Debug release" \
             "- This APK is debug-signed and intended for testing, not production or Play Store distribution." \
-            "- Its application ID has the .debug suffix." \
             "- A later CI run may use a different debug key; uninstall an older debug build if Android refuses the update." \
             "- Triggered by: ${{ github.event_name }}" \
             "- Build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             "" \
-            "[Download debug APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/app-debug.apk)" \
+            "[Download debug APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/com.example.dashboardlmstudio-Signed.apk)" \
             "[Download companion metrics server](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/DashboardLMStudio_MetricsServer.zip)" > /tmp/release_body.txt
           gh release create "$TAG_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_NAME" \
             --notes-file /tmp/release_body.txt \
-            release-assets/app-debug.apk \
+            release-assets/com.example.dashboardlmstudio-Signed.apk \
             release-assets/DashboardLMStudio_MetricsServer.zip
 
   notify:

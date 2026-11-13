@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">LM Studio Monitor</string>
-    <string name="hint_server_url">http://192.168.129.35:8000</string>
-    <string name="btn_connect">Connect</string>
-    <string name="btn_disconnect">Disconnect</string>
-    <string name="btn_start_monitoring">Start Monitoring</string>
-    <string name="btn_stop_monitoring">Stop Monitoring</string>
-</resources>

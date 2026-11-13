@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:DashboardLMStudio.ViewModels"
+             x:Class="DashboardLMStudio.MainPage"
+             Title="LM Studio Monitor"
+             BackgroundColor="#121212">
+
+    <ContentPage.BindingContext>
+        <vm:MainViewModel />
+    </ContentPage.BindingContext>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="12">
+
+            <!-- Header -->
+            <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                <Label Text="LM Studio Monitor"
+                       FontSize="24"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       HorizontalOptions="Fill"
+                       VerticalOptions="Center" />
+                <Label Text="{Binding ConnectionStatusText}"
+                       TextColor="{Binding ConnectionStatusColor}"
+                       FontSize="14"
+                       VerticalOptions="Center" />
+                <ActivityIndicator IsRunning="{Binding IsConnecting}"
+                                   IsVisible="{Binding IsConnecting}"
+                                   Color="White" />
+            </HorizontalStackLayout>
+
+            <!-- Server URL -->
+            <Entry Text="{Binding ServerUrl}"
+                   Placeholder="http://192.168.129.35:8000"
+                   TextColor="White"
+                   PlaceholderColor="#B0B0B0" />
+
+            <!-- Optional bridge API key -->
+            <Entry Text="{Binding ApiKey}"
+                   Placeholder="Bridge API key (optional)"
+                   IsPassword="True"
+                   TextColor="White"
+                   PlaceholderColor="#B0B0B0" />
+
+            <!-- Connect / Disconnect -->
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="Connect"
+                        Command="{Binding ConnectCommand}"
+                        IsEnabled="{Binding CanConnect}"
+                        HorizontalOptions="Fill" />
+                <Button Text="Disconnect"
+                        Command="{Binding DisconnectCommand}"
+                        IsEnabled="{Binding CanDisconnect}"
+                        HorizontalOptions="Fill" />
+            </HorizontalStackLayout>
+
+            <Button Text="{Binding MonitoringLabel}"
+                    Command="{Binding ToggleMonitoringCommand}"
+                    BackgroundColor="#4CAF50"
+                    TextColor="White" />
+
+            <!-- Metrics grid -->
+            <Grid ColumnDefinitions="*,*"
+                  RowDefinitions="Auto,Auto,Auto"
+                  ColumnSpacing="8"
+                  RowSpacing="8">
+
+                <Border Grid.Row="0" Grid.Column="0" BackgroundColor="#1E1E1E" Padding="16">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="CPU Usage" TextColor="#B0B0B0" FontSize="12" />
+                        <Label Text="{Binding CpuText}" TextColor="#FF5722" FontSize="32" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Row="0" Grid.Column="1" BackgroundColor="#1E1E1E" Padding="16">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Memory Usage" TextColor="#B0B0B0" FontSize="12" />
+                        <Label Text="{Binding MemoryText}" TextColor="#2196F3" FontSize="32" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Row="1" Grid.Column="0" BackgroundColor="#1E1E1E" Padding="16">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Tokens/sec" TextColor="#B0B0B0" FontSize="12" />
+                        <Label Text="{Binding TokenText}" TextColor="#4CAF50" FontSize="32" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Row="1" Grid.Column="1" BackgroundColor="#1E1E1E" Padding="16">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="GPU Usage / VRAM" TextColor="#B0B0B0" FontSize="12" />
+                        <Label Text="{Binding GpuText}" TextColor="#9C27B0" FontSize="24" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Row="2" Grid.Column="0" BackgroundColor="#1E1E1E" Padding="16">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Prompt / Completion Tokens" TextColor="#B0B0B0" FontSize="12" />
+                        <Label Text="{Binding PromptCompletionText}" TextColor="#03A9F4" FontSize="24" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Row="2" Grid.Column="1" BackgroundColor="#1E1E1E" Padding="16">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Errors" TextColor="#B0B0B0" FontSize="12" />
+                        <Label Text="{Binding ErrorCountText}" TextColor="#F44336" FontSize="32" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Border>
+
+            </Grid>
+
+            <!-- Error log -->
+            <Label Text="Error Log"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   TextColor="White" />
+
+            <CollectionView ItemsSource="{Binding Errors}" HeightRequest="240">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <VerticalStackLayout Padding="8" Spacing="2">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="{Binding Timestamp}" TextColor="#B0B0B0" FontSize="11" />
+                                <Label Text="{Binding Level}" TextColor="{Binding LevelColor}" FontSize="11" FontAttributes="Bold" />
+                                <Label Text="{Binding SourceLabel}" TextColor="#B0B0B0" FontSize="11" />
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding Message}" TextColor="White" FontSize="12" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

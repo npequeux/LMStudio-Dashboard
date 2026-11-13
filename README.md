@@ -6,17 +6,17 @@ An Android dashboard for viewing metrics from a reachable LM Studio-compatible s
 
 ## Download the app
 
-- [Download the latest temporary debug APK](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/app-debug.apk)
+- [Download the latest debug APK](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/com.example.dashboardlmstudio-Signed.apk)
 - [Download the companion metrics server ZIP](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/DashboardLMStudio_MetricsServer.zip)
 - [Latest release notes](https://github.com/npequeux/LMStudio-Dashboard/releases/latest)
 - [All releases](https://github.com/npequeux/LMStudio-Dashboard/releases)
 - [GitHub Actions builds](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) — temporary debug APK artifacts may require signing in to GitHub.
 
-The direct APK and companion ZIP links become available after the next successful GitHub Release. This temporary build uses the `.debug` application ID and debug signing, and is for testing only. Each CI run may generate a different debug key; uninstall an older debug build before installing a new one if Android rejects the update. The app requires Android 8.0 (API 26) or later.
+The direct APK and companion ZIP links become available after the next successful GitHub Release. This build is debug-signed and is for testing only. Each CI run may generate a different debug key; uninstall an older debug build before installing a new one if Android rejects the update. The app requires Android 8.0 (API 26) or later.
 
 ## Install on Android
 
-1. Open the [latest release](https://github.com/npequeux/LMStudio-Dashboard/releases/latest) on your Android device and download `app-debug.apk`.
+1. Open the [latest release](https://github.com/npequeux/LMStudio-Dashboard/releases/latest) on your Android device and download `com.example.dashboardlmstudio-Signed.apk`.
 2. If prompted, allow your browser or file manager to install unknown apps. On Android 8+, this permission is under **Settings → Apps → Special app access → Install unknown apps**.
 3. Open the downloaded APK and tap **Install**.
 4. After installation, you can turn off the install-unknown-apps permission again.
@@ -78,16 +78,16 @@ If using Python/pip instead of uv, from the companion folder run `py -m venv .ve
 ## Architecture
 ```
 ┌─────────────────────────────────────────┐
-│              MainActivity                │
+│        MainPage (.NET MAUI)             │
 │  ┌──────────┬──────────┬──────────────┐ │
 │  │   CPU    │ Memory   │ Tokens/sec   │ │
 │  │  Card    │ Card     │   Card       │ │
 │  └──────────┴──────────┴──────────────┘ │
 │  ┌─────────────────────────────────────┐│
-│  │         Error Log (RecyclerView)    ││
+│  │       Error Log (CollectionView)    ││
 │  └─────────────────────────────────────┘│
 └─────────────────────────────────────────┘
-              │ Retrofit + OkHttp
+              │ HttpClient + System.Text.Json
               ▼
 ┌─────────────────────────────────────────┐
 │        Metrics bridge (FastAPI)          │
@@ -109,48 +109,45 @@ If using Python/pip instead of uv, from the companion folder run `py -m venv .ve
 
 ### Prerequisites
 
-- Android Studio or the included Gradle wrapper
+- .NET 10 SDK with the .NET MAUI workload (`dotnet workload install maui-android`)
 - JDK 17 or later
-- Android SDK 35 (`compileSdk = 35`)
+- Android SDK (API 36)
 - A server reachable from the Android device and exposing the routes described below
 
-Set `sdk.dir` in your local, untracked `local.properties`, or let Android Studio configure it. Build and install a debug APK with:
+The MAUI app lives in `app/`. Build a debug APK with:
 
 ```bash
-./gradlew assembleDebug
-./gradlew installDebug
+dotnet build -f net10.0-android -c Release app/DashboardLMStudio.csproj
 ```
 
-On Windows, use `gradlew.bat`. The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`; it is debug-signed and intended for testing.
+The APK is written to `app/bin/Release/net10.0-android/com.example.dashboardlmstudio-Signed.apk`; it is debug-signed and intended for testing.
 
 ## Temporary GitHub releases
 
-For now, GitHub Releases attach the debug APK produced by the build job. This avoids release-keystore secrets and lets you install a test build. It is debug-signed, uses the `.debug` application ID, and is not suitable for production or Google Play. GitHub may generate a different debug key for each run, so uninstall the previous debug build before installing a new one if Android rejects the update.
+For now, GitHub Releases attach the debug APK produced by the build job. This avoids release-keystore secrets and lets you install a test build. It is debug-signed and is not suitable for production or Google Play. GitHub may generate a different debug key for each run, so uninstall the previous debug build before installing a new one if Android rejects the update.
 
 A production release will require a persistent release keystore and GitHub Actions secrets. Do not distribute this temporary debug build as a production app.
 
 ## CI builds
 
-- [Build workflow](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) builds the debug APK and runs the Android and Python bridge tests on pushes and pull requests.
-- Pushes to `main` and `v*` tags create a GitHub Release with `app-debug.apk` and the companion metrics server ZIP.
+- [Build workflow](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) builds the .NET MAUI APK and runs the Python bridge tests on pushes and pull requests.
+- Pushes to `main` and `v*` tags create a GitHub Release with the APK and the companion metrics server ZIP.
 
 ## API endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Connection check |
-| `GET /api/v1/metrics` | CPU, memory, token speed, error metrics, `logMonitor`, `lastUsageAt`, and `liveTokensPerSecond` |
-| `GET /v1/models` | Model list endpoint declared by the client |
-| `GET /api/v1/errors` | Error list endpoint declared by the client |
+| `GET /api/v1/metrics` | CPU, memory, token speed, error metrics, `logMonitor`, `serverLogMonitor`, `lastUsageAt`, and `liveTokensPerSecond` |
+| `GET /api/v1/errors` | Error list (declared in the client, not used by the monitoring screen) |
+| `GET /v1/models` | Proxied to LM Studio (not used by the monitoring screen) |
+| `POST /v1/chat/completions` | Proxied to LM Studio (not used by the monitoring screen) |
 
-The monitoring screen currently requests `/health` and `/api/v1/metrics`. The model and standalone error routes are declared in the API client but are not currently used by the monitoring screen. This Android project does not implement the server-side metrics endpoints.
+The monitoring screen requests `/health` and `/api/v1/metrics`; it reads the error list from the metrics response. This Android project does not implement the server-side metrics endpoints.
 
 ## Dependencies
-- **Retrofit 2.9** - REST API client
-- **OkHttp 4.12** - HTTP client with logging interceptor
-- **Gson** - JSON parsing
-- **AndroidX Lifecycle** - ViewModel/LiveData
-- **Material Components** - UI components
+- **.NET MAUI 10** - cross-platform UI
+- **HttpClient + System.Text.Json** - REST API client and JSON parsing
 
 ## License
 MIT License - See LICENSE file for details.

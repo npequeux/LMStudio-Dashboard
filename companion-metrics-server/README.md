@@ -67,13 +67,13 @@ For example: `http://192.168.129.35:8000`.
 - `/api/v1/errors` returns the retained error entries.
 - `/v1/models` and `/v1/chat/completions` proxy to LM Studio.
 
-CPU and system memory are measured on the PC. Token metrics come from the LM Studio desktop app as well as from the bridge's own proxy: the bridge listens to `lms log stream --source model --filter output --stats --json` and records each prediction's token speed and prompt/completion counts, and at startup it seeds the dashboard from the most recent prediction in LM Studio's local conversation history. Proxy requests are measured directly; streaming requests get `stream_options.include_usage` added so a final usage chunk is recorded too. The `logMonitor` field in `/api/v1/metrics` reports the listener state (`running`, `retrying`, `unavailable`, or `disabled`). Because LM Studio only reports final token stats when a response finishes, the bridge also tails LM Studio's server logs for `tg = X t/s` timing lines and exposes `liveTokensPerSecond` (null when the runtime log verbosity does not include them). Proxy errors are kept in an in-memory rolling log (up to 100 entries); restarting the bridge clears it.
+CPU and system memory are measured on the PC. Token metrics come from the LM Studio desktop app as well as from the bridge's own proxy: the bridge listens to `lms log stream --source model --filter output --stats --json` and records each prediction's token speed and prompt/completion counts, and at startup it seeds the dashboard from the most recent prediction in LM Studio's local conversation history. Proxy requests are measured directly; streaming requests get `stream_options.include_usage` added so a final usage chunk is recorded too. The `logMonitor` field in `/api/v1/metrics` reports the diagnostics listener state (`running`, `retrying`, `unavailable`, or `disabled`). Because LM Studio only reports final token stats when a response finishes, the bridge also tails LM Studio's server logs for `tg = X t/s` timing lines and exposes `liveTokensPerSecond` (null when the engine log level does not include those lines), plus `serverLogMonitor` (`running`, `waiting`, or `disabled`) and a `liveTimingLines` counter — `running` with `0` lines means the log level is the blocker, not the code. Proxy errors are kept in an in-memory rolling log (up to 100 entries); restarting the bridge clears it.
 
 ## Configuration
 
 | Environment variable | Default | Purpose |
 | --- | --- | --- |
-| `LM_STUDIO_URL` | `http://192.168.129.35:1234/v1` | LM Studio API base URL; `/v1` is supported |
+| `LM_STUDIO_URL` | `http://127.0.0.1:1234/v1` | LM Studio API base URL; `/v1` is supported |
 | `LM_STUDIO_API_KEY` | unset | Optional bearer token for LM Studio |
 
 ## Verify and test

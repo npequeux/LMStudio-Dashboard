@@ -100,6 +100,11 @@ app/build/
 app/release/
 app/debug/
 
+# .NET / MAUI build outputs
+app/bin/
+.vs/
+*.user
+
 # Generated code (R class, BuildConfig)
 **/generated/**
 **/build/generated/**

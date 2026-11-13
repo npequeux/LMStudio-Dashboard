@@ -332,7 +332,7 @@ def create_app(
 
     @app.get("/health")
     async def health() -> JSONResponse:
-        # Return a JSON string because the Android Retrofit client expects a String body.
+        # Lightweight liveness probe; the client only checks the status code.
         return JSONResponse(content="ok")
 
     @app.get("/api/v1/metrics")
