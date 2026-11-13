@@ -11,7 +11,12 @@ from metrics_server.app import (
     collect_gpu_metrics,
     create_app,
 )
-from metrics_server.lms_log import parse_lms_log_usage
+from metrics_server.lms_log import (
+    _stats_from_conversation,
+    parse_lms_log_usage,
+    seed_state_from_history,
+)
+from metrics_server.state import MetricsState
 
 
 def make_client(handler, *, state=None, metrics_provider=None):
@@ -22,6 +27,7 @@ def make_client(handler, *, state=None, metrics_provider=None):
         metrics_provider=metrics_provider,
         transport=transport,
         enable_lms_log_stream=False,
+        history_reader=lambda: None,
     )
     return TestClient(app)
 
@@ -59,6 +65,7 @@ def test_metrics_match_android_app_contract():
         "completionTokens": 0,
         "errorCount": 0,
         "errors": [],
+        "logMonitor": "disabled",
     }
 
 
@@ -132,6 +139,7 @@ def test_models_proxy_accepts_lm_studio_v1_base_url():
         Settings(lm_studio_url="http://192.168.129.35:1234/v1"),
         transport=httpx.MockTransport(handler),
         enable_lms_log_stream=False,
+        history_reader=lambda: None,
     )
     with TestClient(app) as client:
         response = client.get("/v1/models")
@@ -147,6 +155,8 @@ def test_models_proxy_accepts_base_url_with_v1_suffix():
     app = create_app(
         Settings(lm_studio_url="http://lm-studio.test/v1"),
         transport=httpx.MockTransport(handler),
+        enable_lms_log_stream=False,
+        history_reader=lambda: None,
     )
     with TestClient(app) as client:
         response = client.get("/v1/models")
@@ -191,6 +201,8 @@ def test_native_lmstudio_v0_chat_records_prompt_and_native_stats():
     app = create_app(
         Settings(lm_studio_url="http://lm-studio.test/v1"),
         transport=httpx.MockTransport(handler),
+        enable_lms_log_stream=False,
+        history_reader=lambda: None,
     )
     with TestClient(app) as client:
         response = client.post("/api/v0/chat/completions", json={"model": "test-model", "messages": []})
@@ -269,3 +281,136 @@ def test_streaming_chat_is_forwarded_and_records_usage():
     assert metrics["promptTokens"] == 5
     assert metrics["completionTokens"] == 2
     assert metrics["tokenPerSecond"] == 11.5
+
+
+def test_metrics_reports_log_monitor_status():
+    def handler(request):
+        raise AssertionError("metrics should not contact LM Studio")
+
+    with make_client(handler, metrics_provider=lambda: HostMetrics(1.0, 2)) as client:
+        metrics = client.get("/api/v1/metrics").json()
+
+    assert metrics["logMonitor"] == "disabled"
+
+
+def test_streaming_chat_requests_usage_when_client_does_not_ask():
+    captured = {}
+
+    def handler(request):
+        captured["payload"] = json.loads(request.content)
+        stream = (
+            'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'
+            'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2},'
+            '"stats":{"tokens_per_second":11.5}}\n\n'
+            "data: [DONE]\n\n"
+        )
+        return httpx.Response(200, text=stream, headers={"content-type": "text/event-stream"})
+
+    with make_client(handler) as client:
+        response = client.post(
+            "/v1/chat/completions",
+            json={"model": "test-model", "messages": [], "stream": True},
+        )
+        metrics = client.get("/api/v1/metrics").json()
+
+    assert response.status_code == 200
+    assert captured["payload"]["stream_options"] == {"include_usage": True}
+    assert metrics["promptTokens"] == 5
+    assert metrics["tokenPerSecond"] == 11.5
+
+
+def test_streaming_chat_keeps_client_stream_options():
+    captured = {}
+
+    def handler(request):
+        captured["payload"] = json.loads(request.content)
+        return httpx.Response(
+            200, text="data: [DONE]\n\n", headers={"content-type": "text/event-stream"}
+        )
+
+    with make_client(handler) as client:
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "test-model",
+                "messages": [],
+                "stream": True,
+                "stream_options": {"include_usage": False},
+            },
+        )
+
+    assert response.status_code == 200
+    assert captured["payload"]["stream_options"] == {"include_usage": False}
+
+
+def test_seed_state_from_history_records_last_prediction():
+    state = MetricsState()
+    stats = {"prompt_tokens": 41, "completion_tokens": 964, "tokens_per_second": 8.857}
+
+    assert seed_state_from_history(state, reader=lambda: stats) is True
+
+    snapshot = state.snapshot(cpu_usage=0, memory_used_mb=0)
+    assert snapshot["promptTokens"] == 41
+    assert snapshot["completionTokens"] == 964
+    assert snapshot["tokenPerSecond"] == 8.86
+
+
+def test_seed_state_from_history_skips_when_usage_exists():
+    state = MetricsState()
+    state.record_usage(prompt_tokens=7, completion_tokens=12, elapsed_seconds=1.0)
+
+    assert (
+        seed_state_from_history(
+            state,
+            reader=lambda: {"prompt_tokens": 41, "completion_tokens": 964, "tokens_per_second": 8.857},
+        )
+        is False
+    )
+    assert state.snapshot(cpu_usage=0, memory_used_mb=0)["promptTokens"] == 7
+
+
+def test_stats_from_conversation_returns_latest_prediction():
+    data = {
+        "messages": [
+            {
+                "versions": [
+                    {
+                        "steps": [
+                            {
+                                "genInfo": {
+                                    "stats": {
+                                        "tokensPerSecond": 10.0,
+                                        "promptTokensCount": 1,
+                                        "predictedTokensCount": 2,
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "versions": [
+                    {
+                        "steps": [
+                            {
+                                "genInfo": {
+                                    "stats": {
+                                        "tokensPerSecond": 20.0,
+                                        "promptTokensCount": 3,
+                                        "predictedTokensCount": 4,
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+        ]
+    }
+
+    assert _stats_from_conversation(data) == {
+        "prompt_tokens": 3,
+        "completion_tokens": 4,
+        "tokens_per_second": 20.0,
+    }

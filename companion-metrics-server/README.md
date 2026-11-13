@@ -12,7 +12,7 @@ LM Studio's built-in OpenAI-compatible server does not implement this dashboard'
 - [uv](https://docs.astral.sh/uv/) (recommended), or Python with pip
 - [LM Studio](https://lmstudio.ai/download) installed and its local server running on the PC
 
-By default the bridge connects to LM Studio at `http://192.168.129.35:1234/v1`. Start the API server in LM Studio's **Developer** tab. If it uses another address, set `LM_STUDIO_URL` before starting the bridge. `LM_STUDIO_API_KEY` is optional and is forwarded as a bearer token when set.
+By default the bridge connects to LM Studio at `http://127.0.0.1:1234/v1` (the same machine). Start the API server in LM Studio's **Developer** tab. If LM Studio runs elsewhere, set `LM_STUDIO_URL` before starting the bridge. `LM_STUDIO_API_KEY` is optional and is forwarded as a bearer token when set.
 
 ## Install and run on Windows
 
@@ -67,7 +67,7 @@ For example: `http://192.168.129.35:8000`.
 - `/api/v1/errors` returns the retained error entries.
 - `/v1/models` and `/v1/chat/completions` proxy to LM Studio.
 
-CPU and system memory are measured on the PC. Token speed updates when a successful chat-completion response includes `usage.completion_tokens`. To measure token speed, route inference requests through the bridge at `http://<PC-LAN-IP>:8000`; the Android dashboard itself only polls metrics and does not generate completions. Streaming responses are forwarded, and usage is recorded when LM Studio includes usage data in the stream. Proxy errors are kept in an in-memory rolling log (up to 100 entries); restarting the bridge clears it.
+CPU and system memory are measured on the PC. Token metrics come from the LM Studio desktop app as well as from the bridge's own proxy: the bridge listens to `lms log stream --source model --filter output --stats --json` and records each prediction's token speed and prompt/completion counts, and at startup it seeds the dashboard from the most recent prediction in LM Studio's local conversation history. Proxy requests are measured directly; streaming requests get `stream_options.include_usage` added so a final usage chunk is recorded too. The `logMonitor` field in `/api/v1/metrics` reports the listener state (`running`, `retrying`, `unavailable`, or `disabled`). Proxy errors are kept in an in-memory rolling log (up to 100 entries); restarting the bridge clears it.
 
 ## Configuration
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import importlib
 import json
+import logging
 import os
 import re
 import subprocess
@@ -17,14 +18,16 @@ import psutil
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from metrics_server.lms_log import LmsLogMonitor
+from metrics_server.lms_log import LmsLogMonitor, seed_state_from_history
 from metrics_server.state import MetricsState
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class Settings:
     lm_studio_url: str = field(
-        default_factory=lambda: os.getenv("LM_STUDIO_URL", "http://192.168.129.35:1234/v1")
+        default_factory=lambda: os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234/v1")
     )
     lm_studio_api_key: str | None = field(default_factory=lambda: os.getenv("LM_STUDIO_API_KEY"))
 
@@ -241,6 +244,7 @@ def create_app(
     metrics_provider: Callable[[], HostMetrics] | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
     enable_lms_log_stream: bool = True,
+    history_reader: Callable[[], dict[str, int | float] | None] | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     state = state or MetricsState()
@@ -249,7 +253,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        seed_state_from_history(state, reader=history_reader)
         log_monitor.start()
+        logger.info("LM Studio log monitor status: %s", log_monitor.status)
         try:
             yield
         finally:
@@ -313,13 +319,15 @@ def create_app(
         except Exception as exc:  # keep metrics endpoint available if a host counter fails
             state.record_error(f"Could not read host metrics: {exc}", source="system")
             host_metrics = HostMetrics(cpu_usage=0.0, memory_used_mb=0)
-        return state.snapshot(
+        snapshot = state.snapshot(
             cpu_usage=host_metrics.cpu_usage,
             memory_used_mb=host_metrics.memory_used_mb,
             gpu_usage=host_metrics.gpu_usage,
             gpu_memory_used_mb=host_metrics.gpu_memory_used_mb,
             gpu_memory_total_mb=host_metrics.gpu_memory_total_mb,
         )
+        snapshot["logMonitor"] = log_monitor.status
+        return snapshot
 
     @app.get("/api/v1/errors")
     async def errors() -> list[dict[str, str]]:
@@ -354,11 +362,17 @@ def create_app(
 
         started_at = time.perf_counter()
         upstream_client = client()
+        upstream_body = request_body
+        if payload.get("stream") and "stream_options" not in payload:
+            # Ask LM Studio for a final usage chunk so streaming inferences are
+            # measured too; clients that already set stream_options are left alone.
+            payload = {**payload, "stream_options": {"include_usage": True}}
+            upstream_body = json.dumps(payload).encode("utf-8")
         try:
             upstream_request = upstream_client.build_request(
                 "POST",
                 target_url(upstream_path),
-                content=request_body,
+                content=upstream_body,
                 headers=upstream_headers(request.headers.get("content-type", "application/json")),
             )
             upstream = await upstream_client.send(upstream_request, stream=True)

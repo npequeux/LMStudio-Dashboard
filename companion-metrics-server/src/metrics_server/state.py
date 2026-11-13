@@ -45,6 +45,14 @@ class MetricsState:
         with self._lock:
             self._errors.append(entry)
 
+    def has_usage(self) -> bool:
+        with self._lock:
+            return (
+                self._token_per_second != 0.0
+                or self._prompt_tokens != 0
+                or self._completion_tokens != 0
+            )
+
     def snapshot(
         self,
         cpu_usage: float,

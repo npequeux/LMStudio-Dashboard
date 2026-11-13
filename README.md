@@ -30,12 +30,14 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 3. Tap **Connect**, then **Start Monitoring** after the connection succeeds. Metrics refresh every five seconds.
 4. View CPU, memory, token-speed, and error metrics returned by the bridge.
 
-The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM Studio itself does not implement those routes, which is why pointing the app directly to LM Studio produces an unexpected-endpoint response. The bridge proxies LM Studio's model/inference API and supplies the dashboard's metrics routes. Its source and run instructions are in `companion-metrics-server/` in this repository. The dashboard does not generate completions, so `tokenPerSecond` stays at 0 unless inference requests from another client are routed through the bridge. Plain HTTP is used for this local-network setup; do not expose it to public networks.
+The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM Studio itself does not implement those routes, which is why pointing the app directly to LM Studio produces an unexpected-endpoint response. The bridge proxies LM Studio's model/inference API and supplies the dashboard's metrics routes. Its source and run instructions are in `companion-metrics-server/` in this repository.
+
+Token metrics come from two sources. The bridge listens to LM Studio's live inference diagnostics (`lms log stream`), so predictions made in the LM Studio desktop app are captured while the bridge is running; and at startup the bridge seeds the dashboard from the most recent prediction stored in LM Studio's local conversation history, so the last prediction is visible even when the bridge was started afterwards. Inferences routed through the bridge are measured directly, and streaming requests get `stream_options.include_usage` added so they are measured too. The `logMonitor` field in `/api/v1/metrics` reports whether the live listener is `running`, `retrying`, `unavailable`, or `disabled`. Plain HTTP is used for this local-network setup; do not expose it to public networks.
 
 ### PC requirements
 
-- Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download) and start its API server from the **Developer** tab. The bridge defaults to `http://192.168.129.35:1234/v1`; configure `LM_STUDIO_URL` if yours differs.
-- Run the Python companion service from the `companion-metrics-server` folder in this repository, or download and extract the [companion metrics ZIP](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/DashboardLMStudio_MetricsServer.zip). Its default upstream is `http://192.168.129.35:1234/v1`.
+- Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download) and start its API server from the **Developer** tab. The bridge defaults to `http://127.0.0.1:1234/v1` (same machine as LM Studio); configure `LM_STUDIO_URL` if LM Studio runs elsewhere.
+- Run the Python companion service from the `companion-metrics-server` folder in this repository, or download and extract the [companion metrics ZIP](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/DashboardLMStudio_MetricsServer.zip). Its default upstream is `http://127.0.0.1:1234/v1`.
 - Enter the bridge URL (`http://192.168.129.35:8000`) in the Android app. LM Studio must be reachable at the configured upstream address.
 
 ### Install the companion metrics service on Windows
@@ -48,7 +50,7 @@ The Android app calls `GET /health` and `GET /api/v1/metrics` on the bridge. LM 
    uv sync
    ```
 
-4. Start LM Studio's API server. For the default URL, it must be reachable at `http://192.168.129.35:1234/v1`. If the PC's address or LM Studio port differs, set `LM_STUDIO_URL` in PowerShell before starting the bridge:
+4. Start LM Studio's API server. By default the bridge reaches it at `http://127.0.0.1:1234/v1` on the same PC. If LM Studio runs on another machine or port, set `LM_STUDIO_URL` in PowerShell before starting the bridge:
 
    ```powershell
    $env:LM_STUDIO_URL = "http://<PC-LAN-IP>:1234/v1"
@@ -129,7 +131,7 @@ A production release will require a persistent release keystore and GitHub Actio
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Connection check |
-| `GET /api/v1/metrics` | CPU, memory, token speed, and error metrics |
+| `GET /api/v1/metrics` | CPU, memory, token speed, error metrics, and `logMonitor` status |
 | `GET /v1/models` | Model list endpoint declared by the client |
 | `GET /api/v1/errors` | Error list endpoint declared by the client |
 
