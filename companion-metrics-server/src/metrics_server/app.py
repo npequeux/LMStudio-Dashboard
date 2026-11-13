@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
@@ -16,6 +17,7 @@ import psutil
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from metrics_server.lms_log import LmsLogMonitor
 from metrics_server.state import MetricsState
 
 
@@ -238,11 +240,22 @@ def create_app(
     state: MetricsState | None = None,
     metrics_provider: Callable[[], HostMetrics] | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
+    enable_lms_log_stream: bool = True,
 ) -> FastAPI:
     settings = settings or Settings()
     state = state or MetricsState()
     metrics_provider = metrics_provider or collect_system_metrics
-    app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="0.2.0")
+    log_monitor = LmsLogMonitor(state, enabled=enable_lms_log_stream)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        log_monitor.start()
+        try:
+            yield
+        finally:
+            log_monitor.stop()
+
+    app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="0.2.0", lifespan=lifespan)
     app.state.metrics_state = state
 
     def target_url(path: str) -> str:

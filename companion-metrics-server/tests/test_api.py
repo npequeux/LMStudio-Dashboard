@@ -11,7 +11,7 @@ from metrics_server.app import (
     collect_gpu_metrics,
     create_app,
 )
-from metrics_server.state import MetricsState
+from metrics_server.lms_log import parse_lms_log_usage
 
 
 def make_client(handler, *, state=None, metrics_provider=None):
@@ -210,6 +210,34 @@ def test_upstream_errors_are_exposed_to_dashboard():
     assert metrics["errorCount"] == 1
     assert errors[0]["level"] == "ERROR"
     assert "model server unavailable" in errors[0]["message"]
+
+
+def test_parse_lms_log_output_stats_for_prompt_and_generation():
+    line = json.dumps(
+        {
+            "timestamp": 1777939642794,
+            "data": {
+                "type": "llm.prediction.output",
+                "modelIdentifier": "test-model",
+                "stats": {
+                    "tokensPerSecond": 96.48,
+                    "promptTokensCount": 20,
+                    "predictedTokensCount": 99,
+                },
+            },
+        }
+    )
+
+    assert parse_lms_log_usage(line) == {
+        "prompt_tokens": 20,
+        "completion_tokens": 99,
+        "tokens_per_second": 96.48,
+    }
+
+
+def test_parse_lms_log_ignores_prediction_input_event():
+    line = json.dumps({"data": {"type": "llm.prediction.input", "input": "hello"}})
+    assert parse_lms_log_usage(line) is None
 
 
 def test_streaming_chat_is_forwarded_and_records_usage():
