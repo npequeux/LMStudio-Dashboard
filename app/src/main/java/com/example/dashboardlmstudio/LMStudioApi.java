@@ -32,12 +32,22 @@ public class LMStudioApi {
         private double cpuUsage;
         private long memoryUsedMB;
         private double tokenPerSecond;
+        private Double gpuUsage;
+        private Long gpuMemoryUsedMB;
+        private Long gpuMemoryTotalMB;
+        private long promptTokens;
+        private long completionTokens;
         private int errorCount;
         private List<ErrorLogEntry> errors;
 
         public double getCpuUsage() { return cpuUsage; }
         public long getMemoryUsedMB() { return memoryUsedMB; }
         public double getTokenPerSecond() { return tokenPerSecond; }
+        public Double getGpuUsage() { return gpuUsage; }
+        public Long getGpuMemoryUsedMB() { return gpuMemoryUsedMB; }
+        public Long getGpuMemoryTotalMB() { return gpuMemoryTotalMB; }
+        public long getPromptTokens() { return promptTokens; }
+        public long getCompletionTokens() { return completionTokens; }
         public int getErrorCount() { return errorCount; }
         public List<ErrorLogEntry> getErrors() { return errors != null ? errors : new ArrayList<>(); }
     }

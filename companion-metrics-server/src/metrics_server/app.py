@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 import importlib
 import json
 import os
+import re
+import subprocess
+import sys
 import time
 from collections.abc import Callable
 from typing import Any
@@ -33,8 +36,95 @@ class HostMetrics:
     gpu_memory_total_mb: int | None = None
 
 
+def _windows_gpu_metrics_from_samples(samples: list[dict[str, Any]]) -> tuple[float | None, int | None, int | None]:
+    engine_usage: dict[tuple[str, str], float] = {}
+    memory_used: dict[str, float] = {}
+    memory_total: dict[str, float] = {}
+
+    for sample in samples:
+        path = str(sample.get("Path", sample.get("path", "")))
+        try:
+            value = max(0.0, float(sample.get("CookedValue", sample.get("value", 0))))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        lower_path = path.lower()
+        instance_match = re.search(r"\(([^)]*)\)", path)
+        instance = instance_match.group(1) if instance_match else "default"
+        adapter_match = re.search(r"(luid_.*?_phys_\d+)", instance, re.IGNORECASE)
+        adapter = adapter_match.group(1).lower() if adapter_match else "default"
+
+        if "gpu engine" in lower_path and "utilization percentage" in lower_path:
+            engine_match = re.search(r"engtype_(.*)$", instance, re.IGNORECASE)
+            engine = engine_match.group(1).lower() if engine_match else "other"
+            key = (adapter, engine)
+            engine_usage[key] = engine_usage.get(key, 0.0) + value
+        elif "gpu adapter memory" in lower_path and "dedicated usage" in lower_path:
+            memory_used[adapter] = value
+        elif "gpu adapter memory" in lower_path and "dedicated limit" in lower_path:
+            memory_total[adapter] = value
+
+    adapters = set(memory_used) | {key[0] for key in engine_usage}
+    if not adapters:
+        return None, None, None
+
+    usage_by_adapter: dict[str, float] = {}
+    for adapter in adapters:
+        engine_values = [value for (key_adapter, _), value in engine_usage.items() if key_adapter == adapter]
+        if engine_values:
+            # Task Manager-style: report the busiest GPU engine, capped at 100%.
+            usage_by_adapter[adapter] = min(100.0, max(engine_values))
+    selected = (
+        max(usage_by_adapter, key=lambda adapter: usage_by_adapter[adapter])
+        if usage_by_adapter
+        else next(iter(adapters))
+    )
+    usage = round(usage_by_adapter[selected], 1) if selected in usage_by_adapter else None
+    mb = 1024 * 1024
+    used_mb = int(memory_used[selected] / mb) if selected in memory_used else None
+    total_mb = int(memory_total[selected] / mb) if selected in memory_total else None
+    return usage, used_mb, total_mb
+
+
+def _collect_windows_gpu_metrics() -> tuple[float | None, int | None, int | None]:
+    script = r"""
+$ErrorActionPreference = 'Stop'
+$paths = @()
+try { $paths += (Get-Counter -ListSet 'GPU Engine').PathsWithInstances | Where-Object { $_ -match 'Utilization Percentage$' } } catch {}
+try { $paths += (Get-Counter -ListSet 'GPU Adapter Memory').PathsWithInstances | Where-Object { $_ -match 'Dedicated Usage$|Dedicated Limit$' } } catch {}
+if ($paths.Count -eq 0) { '[]'; exit 0 }
+try {
+  $samples = (Get-Counter -Counter $paths -ErrorAction Stop).CounterSamples
+  $result = @($samples | ForEach-Object { [PSCustomObject]@{ Path = $_.Path; CookedValue = $_.CookedValue } })
+  ConvertTo-Json -InputObject $result -Compress
+} catch { '[]' }
+"""
+    try:
+        completed = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+        if completed.returncode != 0 or not completed.stdout.strip():
+            return None, None, None
+        samples = json.loads(completed.stdout)
+        if isinstance(samples, dict):
+            samples = [samples]
+        if not isinstance(samples, list):
+            return None, None, None
+        return _windows_gpu_metrics_from_samples(samples)
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError):
+        return None, None, None
+
+
 def collect_gpu_metrics(nvml_module: Any | None = None) -> tuple[float | None, int | None, int | None]:
-    """Return NVIDIA utilization and aggregate VRAM, or None values if unavailable."""
+    """Read AMD/any-vendor GPU metrics via Windows counters, with NVML fallback."""
+    if nvml_module is None and sys.platform == "win32":
+        windows_metrics = _collect_windows_gpu_metrics()
+        if any(value is not None for value in windows_metrics):
+            return windows_metrics
+
     nvml = nvml_module
     initialized = False
     try:
@@ -60,10 +150,9 @@ def collect_gpu_metrics(nvml_module: Any | None = None) -> tuple[float | None, i
         mb = 1024 * 1024
         return round(sum(utilizations) / len(utilizations), 1), int(used_bytes / mb), int(total_bytes / mb)
     except Exception:
-        # NVML is unavailable on non-NVIDIA systems or when the driver is not running.
         return None, None, None
     finally:
-        if initialized:
+        if initialized and nvml is not None:
             try:
                 nvml.nvmlShutdown()
             except Exception:

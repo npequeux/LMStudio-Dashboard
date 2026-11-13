@@ -4,7 +4,13 @@ from types import SimpleNamespace
 import httpx
 from fastapi.testclient import TestClient
 
-from metrics_server.app import HostMetrics, Settings, collect_gpu_metrics, create_app
+from metrics_server.app import (
+    HostMetrics,
+    Settings,
+    _windows_gpu_metrics_from_samples,
+    collect_gpu_metrics,
+    create_app,
+)
 from metrics_server.state import MetricsState
 
 
@@ -82,6 +88,25 @@ def test_gpu_metrics_average_utilization_and_sum_vram():
     nvml = FakeNvml()
     assert collect_gpu_metrics(nvml) == (70.0, 3072, 12288)
     assert nvml.shutdown
+
+
+def test_windows_gpu_counters_read_amd_gpu_utilization_and_vram():
+    gpu_engine = (
+        r"\\PC\GPU Engine(pid_123_luid_0x00000000_0x0000abcd_phys_0_eng_0_engtype_3D)"
+        r"\Utilization Percentage"
+    )
+    adapter_usage = r"\\PC\GPU Adapter Memory(luid_0x00000000_0x0000abcd_phys_0)\Dedicated Usage"
+    adapter_limit = r"\\PC\GPU Adapter Memory(luid_0x00000000_0x0000abcd_phys_0)\Dedicated Limit"
+
+    metrics = _windows_gpu_metrics_from_samples(
+        [
+            {"Path": gpu_engine, "CookedValue": 42.5},
+            {"Path": adapter_usage, "CookedValue": 2 * 1024**3},
+            {"Path": adapter_limit, "CookedValue": 8 * 1024**3},
+        ]
+    )
+
+    assert metrics == (42.5, 2048, 8192)
 
 
 def test_models_endpoint_proxies_to_lm_studio():
