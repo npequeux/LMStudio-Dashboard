@@ -72,11 +72,11 @@ public class MainViewModel : INotifyPropertyChanged
         _ => "Disconnected",
     };
 
-    public Color ConnectionStatusColor => _state switch
+    public Color ConnectionStatusFill => _state switch
     {
-        ConnectionState.Connected => Color.FromRgb(0x4C, 0xAF, 0x50),
-        ConnectionState.Connecting => Color.FromRgb(0xFF, 0x98, 0x00),
-        _ => Color.FromRgb(0xF4, 0x43, 0x36),
+        ConnectionState.Connected => Color.FromRgb(0x33, 0xCC, 0x99),
+        ConnectionState.Connecting => Color.FromRgb(0xFF, 0xCC, 0x00),
+        _ => Color.FromRgb(0xFF, 0x33, 0x33),
     };
 
     public bool IsConnecting => _state == ConnectionState.Connecting;
@@ -100,7 +100,7 @@ public class MainViewModel : INotifyPropertyChanged
     private void UpdateStateProperties()
     {
         OnPropertyChanged(nameof(ConnectionStatusText));
-        OnPropertyChanged(nameof(ConnectionStatusColor));
+        OnPropertyChanged(nameof(ConnectionStatusFill));
         OnPropertyChanged(nameof(IsConnecting));
         OnPropertyChanged(nameof(CanConnect));
         OnPropertyChanged(nameof(CanDisconnect));

@@ -41,4 +41,20 @@
     <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
     <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
     <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+
+    <!-- LCARS (Star Trek) theme -->
+    <Color x:Key="LcarsBackground">#000000</Color>
+    <Color x:Key="LcarsPanel">#0A0E1A</Color>
+    <Color x:Key="LcarsOrange">#FF9900</Color>
+    <Color x:Key="LcarsLightOrange">#FFCC99</Color>
+    <Color x:Key="LcarsPurple">#CC99CC</Color>
+    <Color x:Key="LcarsLavender">#9999CC</Color>
+    <Color x:Key="LcarsBlue">#3366CC</Color>
+    <Color x:Key="LcarsLightBlue">#99CCFF</Color>
+    <Color x:Key="LcarsRed">#FF3333</Color>
+    <Color x:Key="LcarsYellow">#FFCC00</Color>
+    <Color x:Key="LcarsGreen">#33CC99</Color>
+    <Color x:Key="LcarsInk">#0A0A0A</Color>
+    <Color x:Key="LcarsText">#EAF2FF</Color>
+    <Color x:Key="LcarsTextDim">#7FA6C9</Color>
 </ResourceDictionary>

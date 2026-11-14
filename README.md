@@ -4,6 +4,12 @@
 ## Overview
 An Android dashboard for viewing metrics from a reachable LM Studio-compatible server.
 
+## Preview
+
+![LCARS theme dashboard](docs/preview.png)
+
+The app uses a Star Trek LCARS-style theme: black background, rounded "padd" blocks in the classic orange / blue / purple / red palette, with the connection status shown as a coloured pill. Metric cards refresh every five seconds; the error log sits in its own panel below.
+
 ## Download the app
 
 - [Download the latest debug APK](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/com.example.dashboardlmstudio-Signed.apk)
@@ -111,7 +117,7 @@ If using Python/pip instead of uv, from the companion folder run `py -m venv .ve
 
 - .NET 10 SDK with the .NET MAUI workload (`dotnet workload install maui-android`)
 - JDK 17 or later
-- Android SDK (API 36)
+- Android SDK (API 36). If dotnet cannot find it, set `ANDROID_HOME` to your SDK folder (e.g. `%LOCALAPPDATA%\Android\Sdk`) or pass `-p:AndroidSdkDirectory=<path>`.
 - A server reachable from the Android device and exposing the routes described below
 
 The MAUI app lives in `app/`. Build a debug APK with:

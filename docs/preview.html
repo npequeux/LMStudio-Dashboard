@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LM Studio Monitor — LCARS preview</title>
+<style>
+  :root {
+    --bg: #000000;
+    --panel: #0A0E1A;
+    --orange: #FF9900;
+    --light-orange: #FFCC99;
+    --purple: #CC99CC;
+    --lavender: #9999CC;
+    --blue: #3366CC;
+    --light-blue: #99CCFF;
+    --red: #FF3333;
+    --yellow: #FFCC00;
+    --green: #33CC99;
+    --ink: #0A0A0A;
+    --text: #EAF2FF;
+    --text-dim: #7FA6C9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #14161c;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 28px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .phone {
+    width: 420px;
+    background: var(--bg);
+    border-radius: 30px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.7);
+  }
+  .statusbar {
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--text-dim); font-size: 11px; padding: 2px 8px 0;
+  }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .padd {
+    border-radius: 16px;
+    padding: 14px 16px;
+  }
+  .title-padd {
+    flex: 1;
+    background: var(--orange);
+  }
+  .title-padd span { color: var(--ink); font-size: 19px; font-weight: 700; letter-spacing: .5px; }
+  .status-pill {
+    background: var(--green);
+    border-radius: 16px;
+    padding: 12px 14px;
+  }
+  .status-pill span { color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--blue);
+    border-radius: 18px;
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .field {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 11px 12px;
+    color: var(--text);
+    font-size: 13px;
+  }
+  .field.muted { color: var(--text-dim); }
+  .btn-row { display: flex; gap: 10px; }
+  .btn {
+    flex: 1; text-align: center; border-radius: 12px;
+    padding: 12px 0; font-size: 13px; font-weight: 700; letter-spacing: .6px;
+  }
+  .btn-green { background: var(--green); color: var(--ink); }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-blue { background: var(--light-blue); color: var(--ink); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .metric { border-radius: 16px; padding: 13px 14px; display: flex; flex-direction: column; gap: 3px; }
+  .metric label { font-size: 10px; font-weight: 700; letter-spacing: .8px; }
+  .metric span { font-size: 25px; font-weight: 700; }
+  .metric.small span { font-size: 19px; }
+  .m-orange { background: var(--orange); }
+  .m-lightblue { background: var(--light-blue); }
+  .m-purple { background: var(--purple); }
+  .m-lavender { background: var(--lavender); }
+  .m-lightorange { background: var(--light-orange); }
+  .m-red { background: var(--red); }
+  .ink { color: var(--ink); }
+  .white { color: #fff; }
+  .log-panel {
+    background: var(--panel);
+    border: 1px solid var(--red);
+    border-radius: 18px;
+    padding: 14px;
+  }
+  .log-title { color: var(--light-blue); font-size: 13px; font-weight: 700; letter-spacing: .8px; margin-bottom: 8px; }
+  .log-entry { padding: 6px 0; display: flex; flex-direction: column; gap: 2px; }
+  .log-meta { display: flex; gap: 8px; font-size: 10px; color: var(--text-dim); }
+  .log-msg { font-size: 12px; color: var(--text); }
+  .level-err { color: var(--red); font-weight: 700; }
+  .level-warn { color: var(--yellow); font-weight: 700; }
+  .caption { color: #8b93a7; font-size: 12px; text-align: center; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="phone">
+      <div class="statusbar"><span>21:45</span><span>LCARS • v1.1</span></div>
+
+      <div class="row">
+        <div class="padd title-padd"><span>LM STUDIO MONITOR</span></div>
+        <div class="status-pill"><span>CONNECTED</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="field">http://192.168.129.35:8000</div>
+        <div class="field muted">API KEY (OPTIONAL)</div>
+        <div class="btn-row">
+          <div class="btn btn-green">CONNECT</div>
+          <div class="btn btn-red">DISCONNECT</div>
+        </div>
+        <div class="btn btn-blue">STOP MONITORING</div>
+      </div>
+
+      <div class="grid">
+        <div class="metric m-orange"><label class="ink">CPU USAGE</label><span class="ink">24%</span></div>
+        <div class="metric m-lightblue"><label class="ink">MEMORY</label><span class="ink">14272 MB</span></div>
+        <div class="metric m-purple"><label class="ink">TOKENS/SEC</label><span class="ink">8.86/s</span></div>
+        <div class="metric small m-lavender"><label class="ink">GPU / VRAM</label><span class="ink">62% 4096/8192</span></div>
+        <div class="metric small m-lightorange"><label class="ink">PROMPT / COMPLETION</label><span class="ink">41 / 964</span></div>
+        <div class="metric m-red"><label class="white">ERRORS</label><span class="white">0</span></div>
+      </div>
+
+      <div class="log-panel">
+        <div class="log-title">ERROR LOG</div>
+        <div class="log-entry">
+          <div class="log-meta"><span>2026-11-13T20:41:02Z</span><span class="level-warn">WARN</span><span>[upstream]</span></div>
+          <div class="log-msg">LM Studio returned HTTP 503</div>
+        </div>
+        <div class="log-entry">
+          <div class="log-meta"><span>2026-11-13T20:38:15Z</span><span class="level-err">ERROR</span><span>[proxy]</span></div>
+          <div class="log-msg">Stream disconnected before completion</div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">Preview mockup — the shipped app renders this layout natively.</div>
+  </div>
+</body>
+</html>
