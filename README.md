@@ -132,7 +132,7 @@ The APK is written to `app/bin/Release/net10.0-android/com.example.dashboardlmst
 
 ## GitHub releases
 
-Each push to `main` and each `v*` tag builds the app and publishes a GitHub Release with the APK and the companion metrics server ZIP. **`v1.0` is the first stable release.** The APK is debug-signed — there is no release keystore — so it is not suitable for Play Store distribution. A production release would need a persistent keystore and GitHub Actions secrets.
+Each push to `main` and each `v*` tag builds the app and publishes a GitHub Release with the APK and the companion metrics server ZIP. **`v1.0` was the first stable release; `v1.1` adds the live token rate (during a response), the model-in-use line, and the standalone web dashboard.** The APK is debug-signed — there is no release keystore — so it is not suitable for Play Store distribution. A production release would need a persistent keystore and GitHub Actions secrets.
 
 ## CI builds
 
