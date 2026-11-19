@@ -255,19 +255,29 @@ def parse_timing_line(line: str) -> float | None:
         return None
 
 
+def _server_log_dirs() -> list[Path]:
+    """LM Studio has moved the engine/server logs around across versions."""
+    lmstudio = Path.home() / ".lmstudio"
+    roots = [lmstudio / "server-logs"]
+    apps = lmstudio / "apps"
+    if apps.is_dir():
+        roots.extend(sorted(p / "server-logs" for p in apps.iterdir() if p.is_dir()))
+    return [root for root in roots if root.is_dir()]
+
+
 def _latest_server_log() -> Path | None:
-    base = Path.home() / ".lmstudio" / "server-logs"
-    if not base.is_dir():
+    files: list[Path] = []
+    for base in _server_log_dirs():
+        try:
+            files.extend(base.rglob("*.log"))
+        except OSError:
+            continue
+    if not files:
         return None
     try:
-        files = sorted(
-            base.rglob("*.log"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
+        return max(files, key=lambda path: path.stat().st_mtime)
     except OSError:
         return None
-    return files[0] if files else None
 
 
 class ServerLogMonitor:
