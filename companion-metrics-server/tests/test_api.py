@@ -46,6 +46,19 @@ def test_health_reports_bridge_ready():
     assert response.json() == "ok"
 
 
+def test_dashboard_serves_lcars_html():
+    def handler(request):
+        raise AssertionError("dashboard should not contact LM Studio")
+
+    with make_client(handler) as client:
+        response = client.get("/")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "LM STUDIO MONITOR" in response.text
+    assert "/api/v1/metrics" in response.text
+
+
 def test_metrics_match_android_app_contract():
     def handler(request):
         raise AssertionError("metrics should not contact LM Studio")

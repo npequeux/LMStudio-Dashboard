@@ -6,6 +6,14 @@ A small FastAPI service for the Android DashboardLMStudio app. It runs beside LM
 
 LM Studio's built-in OpenAI-compatible server does not implement this dashboard's `/health` or `/api/v1/metrics` endpoints. Pointing the Android app directly at LM Studio therefore returns an unexpected-endpoint/404 response. Point the Android app at this bridge instead; the bridge handles those endpoints and forwards `/v1/models` and `/v1/chat/completions` to LM Studio.
 
+## Web dashboard
+
+The bridge also serves a Star Trek LCARS-themed dashboard at `GET /` — open `http://<PC-LAN-IP>:8000/` in any browser, no Android app required. It polls `/api/v1/metrics` every five seconds and shows the same metric cards, monitor status, and error log as the app.
+
+![Bridge dashboard](../docs/bridge-dashboard.png)
+
+If `BRIDGE_API_KEY` is set, the page prompts for the key and sends it as a bearer token. `/health` and the dashboard shell stay open, but `/api/v1/metrics` and the proxy stay protected.
+
 ## Requirements
 
 - Python 3.11 or later
@@ -81,6 +89,7 @@ CPU and system memory are measured on the PC. Token metrics come from the LM Stu
 With the bridge running, these URLs should respond:
 
 - `http://127.0.0.1:8000/health`
+- `http://127.0.0.1:8000/` (LCARS dashboard)
 - `http://127.0.0.1:8000/api/v1/metrics`
 - `http://127.0.0.1:8000/v1/models` (requires LM Studio to be running)
 

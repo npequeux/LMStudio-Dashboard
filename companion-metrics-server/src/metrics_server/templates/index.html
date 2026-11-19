@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LM Studio Monitor</title>
+<style>
+  :root {
+    --bg: #000000;
+    --panel: #0A0E1A;
+    --orange: #FF9900;
+    --light-orange: #FFCC99;
+    --purple: #CC99CC;
+    --lavender: #9999CC;
+    --blue: #3366CC;
+    --light-blue: #99CCFF;
+    --red: #FF3333;
+    --yellow: #FFCC00;
+    --green: #33CC99;
+    --ink: #0A0A0A;
+    --text: #EAF2FF;
+    --text-dim: #7FA6C9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 22px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .padd { border-radius: 16px; padding: 14px 16px; }
+  .title-padd { flex: 1; background: var(--orange); }
+  .title-padd span { color: var(--ink); font-size: 19px; font-weight: 700; letter-spacing: .5px; }
+  .status-pill { background: var(--red); border-radius: 16px; padding: 12px 14px; min-width: 96px; text-align: center; }
+  .status-pill span { color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+  .status-pill.ok { background: var(--green); }
+  .status-pill.busy { background: var(--yellow); }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--blue);
+    border-radius: 18px;
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .field { background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 13px; color: var(--text); width: 100%; border: 0; font-family: inherit; }
+  .field::placeholder { color: var(--text-dim); }
+  .btn-row { display: flex; gap: 10px; }
+  .btn { flex: 1; text-align: center; border-radius: 12px; padding: 12px 0; font-size: 13px; font-weight: 700; letter-spacing: .6px; cursor: pointer; border: 0; font-family: inherit; }
+  .btn-green { background: var(--green); color: var(--ink); }
+  .btn-blue { background: var(--light-blue); color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .metric { border-radius: 16px; padding: 13px 14px; display: flex; flex-direction: column; gap: 3px; }
+  .metric label { font-size: 10px; font-weight: 700; letter-spacing: .8px; }
+  .metric span { font-size: 25px; font-weight: 700; }
+  .metric.small span { font-size: 18px; }
+  .m-orange { background: var(--orange); }
+  .m-lightblue { background: var(--light-blue); }
+  .m-purple { background: var(--purple); }
+  .m-lavender { background: var(--lavender); }
+  .m-lightorange { background: var(--light-orange); }
+  .m-red { background: var(--red); }
+  .ink { color: var(--ink); }
+  .white { color: #fff; }
+  .log-panel { background: var(--panel); border: 1px solid var(--red); border-radius: 18px; padding: 14px; }
+  .log-title { color: var(--light-blue); font-size: 13px; font-weight: 700; letter-spacing: .8px; margin-bottom: 8px; }
+  .log-entry { padding: 6px 0; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #16203a; }
+  .log-entry:first-of-type { border-top: 0; }
+  .log-meta { display: flex; gap: 8px; font-size: 10px; color: var(--text-dim); flex-wrap: wrap; }
+  .log-msg { font-size: 12px; color: var(--text); }
+  .level-ERROR { color: var(--red); font-weight: 700; }
+  .level-WARN { color: var(--yellow); font-weight: 700; }
+  .statusline { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--text-dim); }
+  .statusline b { color: var(--light-blue); font-weight: 700; }
+  .hint { font-size: 12px; color: var(--text-dim); text-align: center; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div class="padd title-padd"><span>LM STUDIO MONITOR</span></div>
+      <div class="status-pill" id="status"><span>OFFLINE</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="statusline">
+        <span>logMonitor <b id="logMonitor">—</b></span>
+        <span>serverLogMonitor <b id="serverLogMonitor">—</b></span>
+        <span>liveTimingLines <b id="liveTimingLines">—</b></span>
+        <span>lastUsageAt <b id="lastUsageAt">—</b></span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-green" id="monitorBtn">START MONITORING</button>
+        <button class="btn btn-blue" id="nowBtn">REFRESH NOW</button>
+      </div>
+      <div id="keyBox" class="hidden">
+        <input class="field" type="password" id="apiKey" placeholder="BRIDGE API KEY (SERVER HAS BRIDGE_API_KEY SET)">
+        <button class="btn btn-blue" id="keyBtn">UNLOCK</button>
+      </div>
+      <div class="hint" id="hint">Auto-refreshes every 5 seconds.</div>
+    </div>
+
+    <div class="grid">
+      <div class="metric m-orange"><label class="ink">CPU USAGE</label><span class="ink" id="cpu">—</span></div>
+      <div class="metric m-lightblue"><label class="ink">MEMORY</label><span class="ink" id="mem">—</span></div>
+      <div class="metric m-purple"><label class="ink">TOKENS/SEC</label><span class="ink" id="tps">—</span></div>
+      <div class="metric small m-lavender"><label class="ink">GPU / VRAM</label><span class="ink" id="gpu">—</span></div>
+      <div class="metric small m-lightorange"><label class="ink">PROMPT / COMPLETION</label><span class="ink" id="tokens">—</span></div>
+      <div class="metric m-red"><label class="white">ERRORS</label><span class="white" id="errors">—</span></div>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-title">ERROR LOG</div>
+      <div id="log"><div class="hint">No errors recorded.</div></div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let timer = null;
+
+  function key() { return sessionStorage.getItem("bridgeKey") || ""; }
+
+  async function fetchMetrics() {
+    const headers = key() ? { Authorization: "Bearer " + key() } : {};
+    const res = await fetch("/api/v1/metrics", { headers });
+    if (res.status === 401) {
+      $("keyBox").classList.remove("hidden");
+      setStatus("LOCKED", "busy");
+      throw new Error("unauthorized");
+    }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }
+
+  function setStatus(text, cls) {
+    const el = $("status");
+    el.className = "status-pill" + (cls ? " " + cls : "");
+    el.querySelector("span").textContent = text;
+  }
+
+  function render(d) {
+    $("cpu").textContent = (d.cpuUsage != null ? d.cpuUsage : 0) + "%";
+    $("mem").textContent = (d.memoryUsedMB != null ? d.memoryUsedMB : 0) + " MB";
+
+    const live = d.liveTokensPerSecond;
+    const liveAt = d.liveTokensPerSecondAt ? Date.parse(d.liveTokensPerSecondAt) : 0;
+    const fresh = live != null && liveAt && (Date.now() - liveAt) >= 0 && (Date.now() - liveAt) <= 10000;
+    $("tps").textContent = (fresh ? live : (d.tokenPerSecond != null ? d.tokenPerSecond : 0)) + "/s";
+
+    if (d.gpuUsage == null) {
+      $("gpu").textContent = "N/A";
+    } else {
+      let g = Math.round(d.gpuUsage) + "%";
+      if (d.gpuMemoryUsedMB != null && d.gpuMemoryTotalMB != null) {
+        g += " " + d.gpuMemoryUsedMB + "/" + d.gpuMemoryTotalMB;
+      }
+      $("gpu").textContent = g;
+    }
+
+    $("tokens").textContent = (d.promptTokens || 0) + " / " + (d.completionTokens || 0);
+    $("errors").textContent = d.errorCount != null ? d.errorCount : (d.errors ? d.errors.length : 0);
+    $("logMonitor").textContent = d.logMonitor || "—";
+    $("serverLogMonitor").textContent = d.serverLogMonitor || "—";
+    $("liveTimingLines").textContent = d.liveTimingLines != null ? d.liveTimingLines : "—";
+    $("lastUsageAt").textContent = d.lastUsageAt ? new Date(d.lastUsageAt).toLocaleTimeString() : "—";
+
+    const log = $("log");
+    if (!d.errors || d.errors.length === 0) {
+      log.innerHTML = '<div class="hint">No errors recorded.</div>';
+    } else {
+      log.innerHTML = d.errors.map((e) => {
+        const t = e.timestamp ? new Date(e.timestamp).toLocaleString() : "";
+        const lvl = (e.level || "").toUpperCase();
+        return '<div class="log-entry">' +
+          '<div class="log-meta"><span>' + t + '</span>' +
+          '<span class="level-' + lvl + '">' + lvl + '</span>' +
+          '<span>[' + (e.source || "unknown") + ']</span></div>' +
+          '<div class="log-msg"></div></div>';
+      }).join("");
+      // textContent for messages avoids HTML injection from the bridge
+      [...log.querySelectorAll(".log-msg")].forEach((el, i) => { el.textContent = d.errors[i].message || ""; });
+    }
+    setStatus("CONNECTED", "ok");
+  }
+
+  async function poll() {
+    try {
+      const d = await fetchMetrics();
+      $("keyBox").classList.add("hidden");
+      render(d);
+    } catch (e) {
+      if (e.message !== "unauthorized") setStatus("OFFLINE", "");
+    }
+  }
+
+  function setMonitoring(on) {
+    $("monitorBtn").textContent = on ? "STOP MONITORING" : "START MONITORING";
+    if (timer) { clearInterval(timer); timer = null; }
+    if (on) { poll(); timer = setInterval(poll, 5000); }
+  }
+
+  $("monitorBtn").addEventListener("click", () => setMonitoring(!timer));
+  $("nowBtn").addEventListener("click", poll);
+  $("keyBtn").addEventListener("click", () => {
+    sessionStorage.setItem("bridgeKey", $("apiKey").value.trim());
+    poll();
+  });
+
+  setMonitoring(true);
+</script>
+</body>
+</html>

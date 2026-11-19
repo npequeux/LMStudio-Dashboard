@@ -7,6 +7,7 @@ import importlib
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -18,7 +19,7 @@ from typing import Any
 import httpx
 import psutil
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from metrics_server.lms_log import LmsLogMonitor, ServerLogMonitor, seed_state_from_history
 from metrics_server.state import MetricsState
@@ -278,8 +279,8 @@ def create_app(
 
         @app.middleware("http")
         async def require_bridge_key(request: Request, call_next):
-            # /health only reports liveness; every other route needs the key.
-            if request.url.path == "/health":
+            # /health and the dashboard shell are open; the data routes need the key.
+            if request.url.path in ("/health", "/"):
                 return await call_next(request)
             auth = request.headers.get("authorization", "")
             token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
@@ -329,6 +330,16 @@ def create_app(
                 source="upstream",
             )
         return relay(upstream, upstream.content)
+
+    dashboard_template = Path(__file__).with_name("templates") / "index.html"
+
+    @app.get("/", response_class=HTMLResponse)
+    async def dashboard() -> Response:
+        """LCARS-style live dashboard served by the bridge itself."""
+        try:
+            return HTMLResponse(dashboard_template.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail="dashboard template missing") from exc
 
     @app.get("/health")
     async def health() -> JSONResponse:
