@@ -99,15 +99,16 @@ jobs:
           RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && format('v{0}', github.run_number) || github.ref_name }}
         run: |
           TAG_NAME="$RELEASE_TAG"
-          RELEASE_NAME="Release $TAG_NAME (debug build)"
-          printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
-            "## Debug release" \
-            "- This APK is debug-signed and intended for testing, not production or Play Store distribution." \
-            "- A later CI run may use a different debug key; uninstall an older debug build if Android refuses the update." \
+          RELEASE_NAME="LM Studio Monitor $TAG_NAME"
+          printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+            "## LM Studio Monitor $TAG_NAME" \
+            "- .NET MAUI Android dashboard with a Star Trek LCARS theme: CPU, memory, GPU, token speed, prompt/completion and error metrics." \
+            "- Ships the FastAPI metrics bridge, which also serves the same dashboard at GET /." \
+            "- The APK is debug-signed (no release keystore), so it is not suitable for Play Store distribution." \
             "- Triggered by: ${{ github.event_name }}" \
             "- Build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             "" \
-            "[Download debug APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/com.example.dashboardlmstudio-Signed.apk)" \
+            "[Download APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/com.example.dashboardlmstudio-Signed.apk)" \
             "[Download companion metrics server](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/DashboardLMStudio_MetricsServer.zip)" > /tmp/release_body.txt
           gh release create "$TAG_NAME" \
             --repo "$GITHUB_REPOSITORY" \

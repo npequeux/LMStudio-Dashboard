@@ -128,11 +128,9 @@ dotnet build -f net10.0-android -c Release app/DashboardLMStudio.csproj
 
 The APK is written to `app/bin/Release/net10.0-android/com.example.dashboardlmstudio-Signed.apk`; it is debug-signed and intended for testing.
 
-## Temporary GitHub releases
+## GitHub releases
 
-For now, GitHub Releases attach the debug APK produced by the build job. This avoids release-keystore secrets and lets you install a test build. It is debug-signed and is not suitable for production or Google Play. GitHub may generate a different debug key for each run, so uninstall the previous debug build before installing a new one if Android rejects the update.
-
-A production release will require a persistent release keystore and GitHub Actions secrets. Do not distribute this temporary debug build as a production app.
+Each push to `main` and each `v*` tag builds the app and publishes a GitHub Release with the APK and the companion metrics server ZIP. **`v1.0` is the first stable release.** The APK is debug-signed — there is no release keystore — so it is not suitable for Play Store distribution. A production release would need a persistent keystore and GitHub Actions secrets.
 
 ## CI builds
 
