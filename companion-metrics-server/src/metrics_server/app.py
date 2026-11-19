@@ -34,6 +34,10 @@ class Settings:
     )
     lm_studio_api_key: str | None = field(default_factory=lambda: os.getenv("LM_STUDIO_API_KEY"))
     bridge_api_key: str | None = field(default_factory=lambda: os.getenv("BRIDGE_API_KEY"))
+    enable_lm_studio_debug_logs: bool = field(
+        default_factory=lambda: os.getenv("ENABLE_LM_STUDIO_DEBUG_LOGS", "").strip().lower()
+        in ("1", "true", "yes", "on")
+    )
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,41 @@ class HostMetrics:
     gpu_usage: float | None = None
     gpu_memory_used_mb: int | None = None
     gpu_memory_total_mb: int | None = None
+
+
+def _enable_lm_studio_debug_logs() -> bool:
+    """Raise LM Studio's engine log level so it writes live token timing lines.
+
+    LM Studio only emits `tg = X t/s` / `tokens per second` lines at the Debug
+    level, and that setting only applies after the model is (re)loaded. Returns
+    True when the setting file was changed.
+    """
+    settings_path = Path.home() / ".lmstudio" / "settings.json"
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning("Could not read LM Studio settings: %s", exc)
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    developer = data.setdefault("developer", {})
+    if not isinstance(developer, dict):
+        return False
+    try:
+        current = int(developer.get("runtimeLogVerbosityLevel", 0) or 0)
+    except (TypeError, ValueError):
+        current = 0
+    if current >= 5:
+        return False
+
+    developer["runtimeLogVerbosityLevel"] = 5
+    try:
+        settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not update LM Studio settings: %s", exc)
+        return False
+    return True
 
 
 def _windows_gpu_metrics_from_samples(samples: list[dict[str, Any]]) -> tuple[float | None, int | None, int | None]:
@@ -262,6 +301,11 @@ def create_app(
         # Establish the CPU baseline so the first dashboard reading is not 0.
         await asyncio.to_thread(psutil.cpu_percent, None)
         seed_state_from_history(state, reader=history_reader)
+        if settings.enable_lm_studio_debug_logs and _enable_lm_studio_debug_logs():
+            logger.warning(
+                "Raised LM Studio engine log level to Debug; reload the model to start "
+                "logging 'tg = X t/s' timing lines for the live token rate."
+            )
         log_monitor.start()
         server_log_monitor.start()
         logger.info("LM Studio log monitor status: %s", log_monitor.status)

@@ -83,6 +83,11 @@ CPU and system memory are measured on the PC. Token metrics come from the LM Stu
 | --- | --- | --- |
 | `LM_STUDIO_URL` | `http://127.0.0.1:1234/v1` | LM Studio API base URL; `/v1` is supported |
 | `LM_STUDIO_API_KEY` | unset | Optional bearer token for LM Studio |
+| `ENABLE_LM_STUDIO_DEBUG_LOGS` | unset | Set to `1` to have the bridge raise LM Studio's engine log level to Debug. Required for the live token rate (see below). |
+
+### Live token rate
+
+LM Studio only reports a prediction's token speed when the response **finishes** — during a response it exposes no progress. The one live source is the engine's `tg = X t/s` timing line, which LM Studio only writes at the **Debug** engine log level. With `ENABLE_LM_STUDIO_DEBUG_LOGS=1` the bridge sets that level for you; **reload the model once** in LM Studio and `/api/v1/metrics` will start reporting `liveTokensPerSecond` (watch `liveTimingLines` climb). Until then the dashboard shows the last completed response's rate.
 
 ## Verify and test
 

@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from metrics_server.app import (
     HostMetrics,
     Settings,
+    _enable_lm_studio_debug_logs,
     _windows_gpu_metrics_from_samples,
     collect_gpu_metrics,
     create_app,
@@ -57,6 +58,26 @@ def test_dashboard_serves_lcars_html():
     assert "text/html" in response.headers["content-type"]
     assert "LM STUDIO MONITOR" in response.text
     assert "/api/v1/metrics" in response.text
+
+
+def test_enable_lm_studio_debug_logs_updates_settings(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    lmstudio = home / ".lmstudio"
+    lmstudio.mkdir(parents=True)
+    settings_file = lmstudio / "settings.json"
+    settings_file.write_text(
+        json.dumps({"developer": {"runtimeLogVerbosityLevel": 3}, "other": 1}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("metrics_server.app.Path.home", lambda: home)
+
+    assert _enable_lm_studio_debug_logs() is True
+    data = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert data["developer"]["runtimeLogVerbosityLevel"] == 5
+    assert data["other"] == 1  # unrelated keys preserved
+
+    # already at Debug -> no rewrite
+    assert _enable_lm_studio_debug_logs() is False
 
 
 def test_metrics_match_android_app_contract():
