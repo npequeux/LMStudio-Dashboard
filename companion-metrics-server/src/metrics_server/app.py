@@ -22,7 +22,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
-from metrics_server.lms_log import LmsLogMonitor, ServerLogMonitor, seed_state_from_history
+from metrics_server.lms_log import (
+    LmsLogMonitor,
+    RuntimeLogMonitor,
+    ServerLogMonitor,
+    seed_state_from_history,
+)
 from metrics_server.state import MetricsState
 
 logger = logging.getLogger(__name__)
@@ -295,6 +300,7 @@ def create_app(
     metrics_provider: Callable[[], HostMetrics] | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
     enable_lms_log_stream: bool = True,
+    enable_runtime_log_stream: bool = True,
     enable_server_log_monitor: bool = True,
     history_reader: Callable[[], dict[str, int | float] | None] | None = None,
 ) -> FastAPI:
@@ -302,6 +308,7 @@ def create_app(
     state = state or MetricsState()
     metrics_provider = metrics_provider or collect_system_metrics
     log_monitor = LmsLogMonitor(state, enabled=enable_lms_log_stream)
+    runtime_log_monitor = RuntimeLogMonitor(state, enabled=enable_runtime_log_stream)
     server_log_monitor = ServerLogMonitor(state, enabled=enable_server_log_monitor)
 
     @asynccontextmanager
@@ -315,12 +322,15 @@ def create_app(
                 "logging 'tg = X t/s' timing lines for the live token rate."
             )
         log_monitor.start()
+        runtime_log_monitor.start()
         server_log_monitor.start()
         logger.info("LM Studio log monitor status: %s", log_monitor.status)
+        logger.info("LM Studio runtime log monitor status: %s", runtime_log_monitor.status)
         try:
             yield
         finally:
             server_log_monitor.stop()
+            runtime_log_monitor.stop()
             log_monitor.stop()
 
     app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="1.0.0", lifespan=lifespan)
@@ -424,8 +434,9 @@ def create_app(
             gpu_memory_total_mb=host_metrics.gpu_memory_total_mb,
         )
         snapshot["logMonitor"] = log_monitor.status
+        snapshot["runtimeLogMonitor"] = runtime_log_monitor.status
         snapshot["serverLogMonitor"] = server_log_monitor.status
-        snapshot["liveTimingLines"] = server_log_monitor.timing_lines
+        snapshot["liveTimingLines"] = runtime_log_monitor.timing_lines
         return snapshot
 
     @app.get("/api/v1/errors")

@@ -32,6 +32,7 @@ def make_client(handler, *, state=None, metrics_provider=None):
         enable_lms_log_stream=False,
         history_reader=lambda: None,
         enable_server_log_monitor=False,
+        enable_runtime_log_stream=False,
     )
     return TestClient(app)
 
@@ -80,6 +81,28 @@ def test_enable_lm_studio_debug_logs_updates_settings(tmp_path, monkeypatch):
     assert _enable_lm_studio_debug_logs() is False
 
 
+def test_runtime_log_monitor_extracts_live_timing():
+    from metrics_server.lms_log import RuntimeLogMonitor
+
+    parse = RuntimeLogMonitor._parse_timing
+    event = json.dumps({
+        "timestamp": 1,
+        "data": {
+            "type": "runtime.log",
+            "level": "info",
+            "message": "5.07.108.449 I slot print_timing: id  0 | task 164 | n_gen = 150, tg =  17.66 t/s, tg_3s = 15.70 t/s",
+            "engineName": "llama.cpp-win-x86_64-vulkan-avx2",
+        },
+    })
+    assert parse(event) == 17.66
+    # prompt-eval lines are deliberately ignored (they report prompt speed)
+    prompt = json.dumps({"data": {"type": "runtime.log", "message": "prompt eval time = 284.50 ms / 21 tokens (13.55 ms per token, 73.81 tokens per second)"}})
+    assert parse(prompt) is None
+    # unrelated events / malformed lines are ignored
+    assert parse(json.dumps({"data": {"type": "llm.prediction.output"}})) is None
+    assert parse("not json") is None
+
+
 def test_cors_allows_cross_origin_dashboard():
     def handler(request):
         raise AssertionError("metrics should not contact LM Studio")
@@ -114,6 +137,7 @@ def test_metrics_match_android_app_contract():
         "errorCount": 0,
         "errors": [],
         "logMonitor": "disabled",
+        "runtimeLogMonitor": "disabled",
         "serverLogMonitor": "disabled",
         "liveTimingLines": 0,
         "lastUsageAt": None,
@@ -194,6 +218,7 @@ def test_models_proxy_accepts_lm_studio_v1_base_url():
         enable_lms_log_stream=False,
         history_reader=lambda: None,
         enable_server_log_monitor=False,
+        enable_runtime_log_stream=False,
     )
     with TestClient(app) as client:
         response = client.get("/v1/models")
@@ -212,6 +237,7 @@ def test_models_proxy_accepts_base_url_with_v1_suffix():
         enable_lms_log_stream=False,
         history_reader=lambda: None,
         enable_server_log_monitor=False,
+        enable_runtime_log_stream=False,
     )
     with TestClient(app) as client:
         response = client.get("/v1/models")
@@ -259,6 +285,7 @@ def test_native_lmstudio_v0_chat_records_prompt_and_native_stats():
         enable_lms_log_stream=False,
         history_reader=lambda: None,
         enable_server_log_monitor=False,
+        enable_runtime_log_stream=False,
     )
     with TestClient(app) as client:
         response = client.post("/api/v0/chat/completions", json={"model": "test-model", "messages": []})
@@ -580,6 +607,7 @@ def test_bridge_key_protects_metrics_when_configured():
         enable_lms_log_stream=False,
         history_reader=lambda: None,
         enable_server_log_monitor=False,
+        enable_runtime_log_stream=False,
         metrics_provider=lambda: HostMetrics(1.0, 2),
     )
     with TestClient(app) as client:

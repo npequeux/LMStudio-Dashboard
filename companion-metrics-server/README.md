@@ -85,12 +85,14 @@ CPU and system memory are measured on the PC. Token metrics come from the LM Stu
 | --- | --- | --- |
 | `LM_STUDIO_URL` | `http://127.0.0.1:1234/v1` | LM Studio API base URL; `/v1` is supported |
 | `LM_STUDIO_API_KEY` | unset | Optional bearer token for LM Studio |
-| `ENABLE_LM_STUDIO_DEBUG_LOGS` | unset | Set to `1` to have the bridge raise LM Studio's engine log level to Debug. Required for the live token rate (see below). |
+| `ENABLE_LM_STUDIO_DEBUG_LOGS` | unset | Optional fallback: raise LM Studio's engine log level to Debug so the file-based tailer can also see timing lines. Not normally needed — the runtime log stream works without it. |
 | `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the bridge from a browser (the standalone web dashboard). Restrict, e.g. `http://192.168.129.35:8000`, if the bridge is exposed beyond your LAN. |
 
 ### Live token rate
 
-LM Studio only reports a prediction's token speed when the response **finishes** — during a response it exposes no progress. The one live source is the engine's `tg = X t/s` timing line, which LM Studio only writes at the **Debug** engine log level. With `ENABLE_LM_STUDIO_DEBUG_LOGS=1` the bridge sets that level for you; **reload the model once** in LM Studio and `/api/v1/metrics` will start reporting `liveTokensPerSecond` (watch `liveTimingLines` climb). Until then the dashboard shows the last completed response's rate.
+LM Studio only reports a prediction's *final* token speed when the response finishes, but it also streams the engine's own log lines through `lms log stream --source runtime`. Those lines contain `slot print_timing: … tg = X t/s`, which the bridge reads live and exposes as `liveTokensPerSecond`. The dashboard shows that value whenever it is newer than the last completed prediction, so the card ticks **during** a response instead of only jumping at the end.
+
+Watch `runtimeLogMonitor` (`running`/`retrying`/`unavailable`) and `liveTimingLines` (climbs as timing lines arrive). No LM Studio settings change is required. If the CLI stream is unavailable, `ENABLE_LM_STUDIO_DEBUG_LOGS=1` additionally raises LM Studio's engine log level so the file-based fallback can pick the lines up.
 
 ## Verify and test
 

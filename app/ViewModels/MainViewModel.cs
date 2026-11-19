@@ -15,7 +15,6 @@ public class MainViewModel : INotifyPropertyChanged
     public enum ConnectionState { Disconnected, Connecting, Connected }
 
     private const int PollIntervalMs = 5000;
-    private static readonly TimeSpan LiveWindow = TimeSpan.FromSeconds(10);
     private const string DefaultServerUrl = "http://192.168.129.35:8000";
 
     private BridgeClient? _client;
@@ -240,14 +239,11 @@ public class MainViewModel : INotifyPropertyChanged
         CpuText = string.Format(CultureInfo.InvariantCulture, "{0:0.#}%", metrics.CpuUsage);
         MemoryText = metrics.MemoryUsedMB.ToString(CultureInfo.InvariantCulture) + " MB";
 
-        if (metrics.LiveTokensPerSecond is double live && IsFresh(metrics.LiveTokensPerSecondAt, LiveWindow))
-        {
-            TokenText = string.Format(CultureInfo.InvariantCulture, "{0:0.##}/s", live);
-        }
-        else
-        {
-            TokenText = string.Format(CultureInfo.InvariantCulture, "{0:0.##}/s", metrics.TokenPerSecond);
-        }
+        var live = metrics.LiveTokensPerSecond;
+        var showLive = live.HasValue
+            && IsAtLeastAsRecent(metrics.LiveTokensPerSecondAt, metrics.LastUsageAt);
+        TokenText = string.Format(
+            CultureInfo.InvariantCulture, "{0:0.##}/s", showLive ? live.GetValueOrDefault() : metrics.TokenPerSecond);
 
         if (metrics.GpuUsage is double gpu)
         {
@@ -281,18 +277,22 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ErrorCountText));
     }
 
-    private static bool IsFresh(string? isoTimestamp, TimeSpan maxAge)
+    /// <summary>
+    /// True when the live rate is at least as recent as the last completed
+    /// prediction. A slow model only emits a timing line every ~50 tokens, so a
+    /// fixed freshness window would discard perfectly good live readings.
+    /// </summary>
+    private static bool IsAtLeastAsRecent(string? candidate, string? baseline)
     {
-        if (string.IsNullOrEmpty(isoTimestamp))
+        if (string.IsNullOrEmpty(candidate) || !DateTimeOffset.TryParse(candidate, out var candidateTime))
         {
             return false;
         }
-        if (!DateTimeOffset.TryParse(isoTimestamp, out var time))
+        if (string.IsNullOrEmpty(baseline) || !DateTimeOffset.TryParse(baseline, out var baselineTime))
         {
-            return false;
+            return true;
         }
-        var age = DateTimeOffset.Now - time;
-        return age >= TimeSpan.Zero && age <= maxAge;
+        return candidateTime >= baselineTime;
     }
 
     private static void RunOnUi(Action action)

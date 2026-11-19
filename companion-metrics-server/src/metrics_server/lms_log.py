@@ -244,7 +244,13 @@ _TIMING_PATTERN = re.compile(
 
 
 def parse_timing_line(line: str) -> float | None:
-    """Extract a live generation rate from an LM Studio server log line."""
+    """Extract a live generation rate from an LM Studio log line.
+
+    Ignores prompt-eval lines: their "tokens per second" is the prompt
+    processing speed, not the generation speed the dashboard shows.
+    """
+    if "prompt eval" in line.lower():
+        return None
     match = _TIMING_PATTERN.search(line)
     if not match:
         return None
@@ -253,6 +259,140 @@ def parse_timing_line(line: str) -> float | None:
         return max(0.0, float(raw))
     except (TypeError, ValueError):
         return None
+
+
+class RuntimeLogMonitor:
+    """Streams LM Studio runtime (engine) logs and extracts live token timing.
+
+    `lms log stream --source runtime` emits `runtime.log` events carrying the
+    engine's own log lines, including `slot print_timing: ... tg = X t/s` while a
+    response is being generated. This is the only live token-rate source; the
+    model diagnostics stream only reports a prediction once it finishes.
+    """
+
+    def __init__(self, state: Any, enabled: bool = True) -> None:
+        self._state = state
+        self._enabled = enabled
+        self._process: subprocess.Popen[str] | None = None
+        self._thread: threading.Thread | None = None
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._status = "disabled" if not enabled else "stopped"
+        self.timing_lines = 0
+
+    @property
+    def status(self) -> str:
+        return self._status
+
+    def start(self) -> bool:
+        if not self._enabled:
+            self._status = "disabled"
+            return False
+        with self._lock:
+            if self._thread is not None:
+                return False
+            self._stop_event.clear()
+            self._thread = threading.Thread(
+                target=self._supervise, name="lms-runtime-log-monitor", daemon=True
+            )
+            self._thread.start()
+        return True
+
+    def _supervise(self) -> None:
+        backoff = 1.0
+        while not self._stop_event.is_set():
+            command = resolve_lms_command()
+            if not command:
+                self._status = "unavailable"
+                logger.warning(
+                    "LM Studio CLI not found; live token rate from runtime logs is disabled. "
+                    "Set LM_STUDIO_CLI to the lms executable if it is installed elsewhere."
+                )
+                return
+            try:
+                process = subprocess.Popen(
+                    [command, "log", "stream", "--source", "runtime", "--json"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except OSError as exc:
+                self._status = "error"
+                logger.warning("Could not start LM Studio runtime log stream: %s", exc)
+                self._stop_event.wait(backoff)
+                backoff = min(backoff * 2.0, 30.0)
+                continue
+
+            with self._lock:
+                self._process = process
+            self._status = "running"
+            backoff = 1.0
+
+            self._consume(process)
+
+            with self._lock:
+                if self._process is process:
+                    self._process = None
+            if self._stop_event.is_set():
+                break
+
+            self._status = "retrying"
+            self._stop_event.wait(backoff)
+            backoff = min(backoff * 2.0, 30.0)
+
+    def _consume(self, process: subprocess.Popen[str]) -> None:
+        if process.stdout is None:
+            return
+        for line in process.stdout:
+            rate = self._parse_timing(line)
+            if rate is not None:
+                self.timing_lines += 1
+                self._state.record_live_rate(rate)
+
+    @staticmethod
+    def _parse_timing(line: str) -> float | None:
+        try:
+            envelope = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        if not isinstance(envelope, dict):
+            return None
+        event = envelope.get("data", envelope)
+        if not isinstance(event, dict) or event.get("type") != "runtime.log":
+            return None
+        message = event.get("message", "")
+        return parse_timing_line(message) if isinstance(message, str) else None
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        with self._lock:
+            process = self._process
+            self._process = None
+            thread = self._thread
+            self._thread = None
+
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    pass
+        if process is not None and process.stdout is not None:
+            try:
+                process.stdout.close()
+            except OSError:
+                pass
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=5)
+        self._status = "stopped"
 
 
 def _server_log_dirs() -> list[Path]:

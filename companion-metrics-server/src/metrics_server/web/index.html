@@ -159,9 +159,9 @@
 
     const live = d.liveTokensPerSecond;
     const liveAt = d.liveTokensPerSecondAt ? Date.parse(d.liveTokensPerSecondAt) : 0;
-    const now = Date.now();
-    const fresh = live != null && liveAt && (now - liveAt) >= 0 && (now - liveAt) <= 10000;
-    $("tps").textContent = (fresh ? live : (d.tokenPerSecond != null ? d.tokenPerSecond : 0)) + "/s";
+    const lastAt = d.lastUsageAt ? Date.parse(d.lastUsageAt) : 0;
+    const showLive = live != null && liveAt && liveAt >= lastAt;
+    $("tps").textContent = (showLive ? live : (d.tokenPerSecond != null ? d.tokenPerSecond : 0)) + "/s";
 
     if (d.gpuUsage == null) {
       $("gpu").textContent = "N/A";
