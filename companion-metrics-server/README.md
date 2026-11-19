@@ -14,6 +14,8 @@ The bridge serves a Star Trek LCARS-themed dashboard at `GET /` — open `http:/
 
 The page is a single self-contained file at `src/metrics_server/web/index.html`. Open it directly (double-click, or `file://…`) and type the bridge URL into the **BRIDGE URL** field — the bridge sends `Access-Control-Allow-Origin: *`, so it works from any origin. The URL and API key are remembered in `localStorage`.
 
+The status line shows the **model in use** (`modelIdentifier` from the last prediction, falling back to the model LM Studio currently has loaded) plus the monitor states; hover the model name for its architecture, quantization, and context length.
+
 If `BRIDGE_API_KEY` is set, the page prompts for the key and sends it as a bearer token. `/health` and the dashboard shell stay open, but `/api/v1/metrics` and the proxy stay protected.
 
 ## Requirements

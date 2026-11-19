@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from datetime import datetime, timezone
 import threading
+from typing import Any
 
 
 class MetricsState:
@@ -17,6 +18,9 @@ class MetricsState:
         self._last_usage_at: str | None = None
         self._live_tokens_per_second: float | None = None
         self._live_tokens_per_second_at: str | None = None
+        self._model_identifier: str | None = None
+        self._model_path: str | None = None
+        self._loaded_model: dict[str, Any] | None = None
 
     def record_usage(
         self,
@@ -47,6 +51,23 @@ class MetricsState:
         with self._lock:
             self._live_tokens_per_second = max(0.0, float(tokens_per_second))
             self._live_tokens_per_second_at = datetime.now(timezone.utc).isoformat()
+
+    def record_model(self, identifier: str | None, path: str | None = None) -> None:
+        """Remember which model produced the predictions we report on."""
+        with self._lock:
+            if identifier:
+                self._model_identifier = identifier
+            if path:
+                self._model_path = path
+
+    def set_loaded_model(self, model: dict[str, Any] | None) -> None:
+        """Store the model LM Studio currently has loaded (from /api/v0/models)."""
+        with self._lock:
+            self._loaded_model = model
+
+    def loaded_model(self) -> dict[str, Any] | None:
+        with self._lock:
+            return self._loaded_model
 
     def _preferred_usage(self) -> tuple[int, int, float]:
         """Caller must hold the lock. Prefer the measured diagnostics rate."""
@@ -97,6 +118,9 @@ class MetricsState:
             "lastUsageAt": last_usage_at,
             "liveTokensPerSecond": live_tokens_per_second,
             "liveTokensPerSecondAt": live_tokens_per_second_at,
+            "modelIdentifier": self._model_identifier,
+            "modelPath": self._model_path,
+            "loadedModel": self._loaded_model,
         }
 
     def errors(self) -> list[dict[str, str]]:

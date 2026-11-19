@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -403,6 +404,38 @@ def create_app(
             )
         return relay(upstream, upstream.content)
 
+    model_cache: dict[str, Any] = {"at": 0.0, "value": None}
+    model_cache_lock = threading.Lock()
+
+    def loaded_model() -> dict[str, Any] | None:
+        """The model LM Studio currently has loaded (cached for 15s)."""
+        now = time.monotonic()
+        with model_cache_lock:
+            if now - model_cache["at"] < 15.0:
+                return model_cache["value"]
+        value: dict[str, Any] | None = None
+        try:
+            response = httpx.get(
+                target_url("/api/v0/models"), headers=upstream_headers(), timeout=5.0
+            )
+            payload = response.json()
+            models = payload.get("data", []) if isinstance(payload, dict) else []
+            for model in models:
+                if isinstance(model, dict) and model.get("state") == "loaded":
+                    value = {
+                        "id": model.get("id"),
+                        "arch": model.get("arch"),
+                        "quantization": model.get("quantization"),
+                        "maxContextLength": model.get("max_context_length"),
+                    }
+                    break
+        except Exception as exc:  # LM Studio may be offline; keep the last value
+            logger.debug("Could not read the loaded model: %s", exc)
+        with model_cache_lock:
+            model_cache["at"] = now
+            model_cache["value"] = value
+        return value
+
     dashboard_template = Path(__file__).with_name("web") / "index.html"
 
     @app.get("/", response_class=HTMLResponse)
@@ -426,6 +459,7 @@ def create_app(
         except Exception as exc:  # keep metrics endpoint available if a host counter fails
             state.record_error(f"Could not read host metrics: {exc}", source="system")
             host_metrics = HostMetrics(cpu_usage=0.0, memory_used_mb=0)
+        state.set_loaded_model(await asyncio.to_thread(loaded_model))
         snapshot = state.snapshot(
             cpu_usage=host_metrics.cpu_usage,
             memory_used_mb=host_metrics.memory_used_mb,

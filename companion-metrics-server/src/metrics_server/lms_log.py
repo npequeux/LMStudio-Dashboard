@@ -46,6 +46,25 @@ def parse_lms_log_event(line: str) -> tuple[str, dict[str, int | float] | None] 
     return event_type, usage
 
 
+def parse_lms_log_model(line: str) -> tuple[str | None, str | None]:
+    """Extract (modelIdentifier, modelPath) from a diagnostics event, if present."""
+    try:
+        envelope = json.loads(line)
+    except (json.JSONDecodeError, TypeError):
+        return None, None
+    if not isinstance(envelope, dict):
+        return None, None
+    event = envelope.get("data", envelope)
+    if not isinstance(event, dict):
+        return None, None
+    identifier = event.get("modelIdentifier")
+    path = event.get("modelPath")
+    return (
+        str(identifier) if identifier else None,
+        str(path) if path else None,
+    )
+
+
 def parse_lms_log_usage(line: str) -> dict[str, int | float] | None:
     """Parse one `lms log stream --stats --json` prediction-output event."""
     parsed = parse_lms_log_event(line)
@@ -194,6 +213,9 @@ class LmsLogMonitor:
         if process.stdout is None:
             return
         for line in process.stdout:
+            identifier, path = parse_lms_log_model(line)
+            if identifier or path:
+                self._state.record_model(identifier, path)
             usage = parse_lms_log_usage(line)
             if usage is None:
                 continue
