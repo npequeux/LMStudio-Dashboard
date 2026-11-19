@@ -10,6 +10,8 @@ An Android dashboard for viewing metrics from a reachable LM Studio-compatible s
 
 The app uses a Star Trek LCARS-style theme: black background, rounded "padd" blocks in the classic orange / blue / purple / red palette, with the connection status shown as a coloured pill. Metric cards refresh every five seconds; the error log sits in its own panel below.
 
+The same dashboard is also available as a **webpage** — the bridge serves it at `http://<PC-LAN-IP>:8000/`, and the standalone file lives at `companion-metrics-server/src/metrics_server/web/index.html` for opening from anywhere. See the [web dashboard](companion-metrics-server/README.md#web-dashboard) section.
+
 ## Download the app
 
 - [Download the latest debug APK](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/com.example.dashboardlmstudio-Signed.apk)

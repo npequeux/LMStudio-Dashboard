@@ -19,6 +19,7 @@ from typing import Any
 import httpx
 import psutil
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from metrics_server.lms_log import LmsLogMonitor, ServerLogMonitor, seed_state_from_history
@@ -37,6 +38,13 @@ class Settings:
     enable_lm_studio_debug_logs: bool = field(
         default_factory=lambda: os.getenv("ENABLE_LM_STUDIO_DEBUG_LOGS", "").strip().lower()
         in ("1", "true", "yes", "on")
+    )
+    cors_origins: tuple[str, ...] = field(
+        default_factory=lambda: tuple(
+            origin.strip()
+            for origin in os.getenv("CORS_ORIGINS", "*").split(",")
+            if origin.strip()
+        )
     )
 
 
@@ -315,8 +323,18 @@ def create_app(
             server_log_monitor.stop()
             log_monitor.stop()
 
-    app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="1.0.0", lifespan=lifespan)
     app.state.metrics_state = state
+
+    # Lets the standalone web dashboard (web/index.html) call the bridge from any
+    # origin, including a file:// page. Restrict with CORS_ORIGINS if needed.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.cors_origins),
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
 
     if settings.bridge_api_key:
         expected_key = settings.bridge_api_key
@@ -375,7 +393,7 @@ def create_app(
             )
         return relay(upstream, upstream.content)
 
-    dashboard_template = Path(__file__).with_name("templates") / "index.html"
+    dashboard_template = Path(__file__).with_name("web") / "index.html"
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard() -> Response:

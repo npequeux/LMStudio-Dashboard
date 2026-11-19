@@ -8,9 +8,11 @@ LM Studio's built-in OpenAI-compatible server does not implement this dashboard'
 
 ## Web dashboard
 
-The bridge also serves a Star Trek LCARS-themed dashboard at `GET /` — open `http://<PC-LAN-IP>:8000/` in any browser, no Android app required. It polls `/api/v1/metrics` every five seconds and shows the same metric cards, monitor status, and error log as the app.
+The bridge serves a Star Trek LCARS-themed dashboard at `GET /` — open `http://<PC-LAN-IP>:8000/` in any browser, no Android app required. It polls `/api/v1/metrics` every five seconds and shows the same metric cards, monitor status, and error log as the app.
 
-![Bridge dashboard](../docs/bridge-dashboard.png)
+![Web dashboard](../docs/web-dashboard.png)
+
+The page is a single self-contained file at `src/metrics_server/web/index.html`. Open it directly (double-click, or `file://…`) and type the bridge URL into the **BRIDGE URL** field — the bridge sends `Access-Control-Allow-Origin: *`, so it works from any origin. The URL and API key are remembered in `localStorage`.
 
 If `BRIDGE_API_KEY` is set, the page prompts for the key and sends it as a bearer token. `/health` and the dashboard shell stay open, but `/api/v1/metrics` and the proxy stay protected.
 
@@ -84,6 +86,7 @@ CPU and system memory are measured on the PC. Token metrics come from the LM Stu
 | `LM_STUDIO_URL` | `http://127.0.0.1:1234/v1` | LM Studio API base URL; `/v1` is supported |
 | `LM_STUDIO_API_KEY` | unset | Optional bearer token for LM Studio |
 | `ENABLE_LM_STUDIO_DEBUG_LOGS` | unset | Set to `1` to have the bridge raise LM Studio's engine log level to Debug. Required for the live token rate (see below). |
+| `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the bridge from a browser (the standalone web dashboard). Restrict, e.g. `http://192.168.129.35:8000`, if the bridge is exposed beyond your LAN. |
 
 ### Live token rate
 

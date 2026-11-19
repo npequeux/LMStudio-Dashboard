@@ -87,6 +87,7 @@
     </div>
 
     <div class="panel">
+      <input class="field" type="url" id="bridgeUrl" placeholder="BRIDGE URL (e.g. http://192.168.129.35:8000)" autocomplete="off">
       <div class="statusline">
         <span>logMonitor <b id="logMonitor">—</b></span>
         <span>serverLogMonitor <b id="serverLogMonitor">—</b></span>
@@ -123,11 +124,20 @@
   const $ = (id) => document.getElementById(id);
   let timer = null;
 
-  function key() { return sessionStorage.getItem("bridgeKey") || ""; }
+  // Served from the bridge (http/https)? Then the same origin is the default.
+  const origin = location.protocol.startsWith("http") ? location.origin : "";
+  $("bridgeUrl").value = localStorage.getItem("bridgeUrl") || origin;
+  $("apiKey").value = localStorage.getItem("bridgeKey") || "";
+
+  function base() {
+    return ($("bridgeUrl").value.trim().replace(/\/+$/, "")) || location.origin;
+  }
 
   async function fetchMetrics() {
-    const headers = key() ? { Authorization: "Bearer " + key() } : {};
-    const res = await fetch("/api/v1/metrics", { headers });
+    const url = base() + "/api/v1/metrics";
+    const key = $("apiKey").value.trim();
+    const headers = key ? { Authorization: "Bearer " + key } : {};
+    const res = await fetch(url, { headers });
     if (res.status === 401) {
       $("keyBox").classList.remove("hidden");
       setStatus("LOCKED", "busy");
@@ -149,7 +159,8 @@
 
     const live = d.liveTokensPerSecond;
     const liveAt = d.liveTokensPerSecondAt ? Date.parse(d.liveTokensPerSecondAt) : 0;
-    const fresh = live != null && liveAt && (Date.now() - liveAt) >= 0 && (Date.now() - liveAt) <= 10000;
+    const now = Date.now();
+    const fresh = live != null && liveAt && (now - liveAt) >= 0 && (now - liveAt) <= 10000;
     $("tps").textContent = (fresh ? live : (d.tokenPerSecond != null ? d.tokenPerSecond : 0)) + "/s";
 
     if (d.gpuUsage == null) {
@@ -182,7 +193,6 @@
           '<span>[' + (e.source || "unknown") + ']</span></div>' +
           '<div class="log-msg"></div></div>';
       }).join("");
-      // textContent for messages avoids HTML injection from the bridge
       [...log.querySelectorAll(".log-msg")].forEach((el, i) => { el.textContent = d.errors[i].message || ""; });
     }
     setStatus("CONNECTED", "ok");
@@ -206,10 +216,9 @@
 
   $("monitorBtn").addEventListener("click", () => setMonitoring(!timer));
   $("nowBtn").addEventListener("click", poll);
-  $("keyBtn").addEventListener("click", () => {
-    sessionStorage.setItem("bridgeKey", $("apiKey").value.trim());
-    poll();
-  });
+  $("bridgeUrl").addEventListener("change", (e) => localStorage.setItem("bridgeUrl", e.target.value));
+  $("apiKey").addEventListener("change", (e) => localStorage.setItem("bridgeKey", e.target.value));
+  $("keyBtn").addEventListener("click", poll);
 
   setMonitoring(true);
 </script>

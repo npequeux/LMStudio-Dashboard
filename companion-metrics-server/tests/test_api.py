@@ -80,6 +80,17 @@ def test_enable_lm_studio_debug_logs_updates_settings(tmp_path, monkeypatch):
     assert _enable_lm_studio_debug_logs() is False
 
 
+def test_cors_allows_cross_origin_dashboard():
+    def handler(request):
+        raise AssertionError("metrics should not contact LM Studio")
+
+    with make_client(handler, metrics_provider=lambda: HostMetrics(1, 2)) as client:
+        response = client.get("/api/v1/metrics", headers={"Origin": "http://localhost:5500"})
+
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "*"
+
+
 def test_metrics_match_android_app_contract():
     def handler(request):
         raise AssertionError("metrics should not contact LM Studio")
