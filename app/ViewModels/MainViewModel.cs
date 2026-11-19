@@ -28,6 +28,12 @@ public class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
+        // Commands must exist before any property setter runs, because the
+        // ServerUrl/ApiKey setters call ChangeCanExecute on them.
+        ConnectCommand = new Command(async () => await ConnectAsync(), () => CanConnect);
+        DisconnectCommand = new Command(Disconnect, () => CanDisconnect);
+        ToggleMonitoringCommand = new Command(ToggleMonitoring, () => _state == ConnectionState.Connected);
+
         var savedUrl = Preferences.Get("server_url", "");
         if (string.IsNullOrWhiteSpace(savedUrl)
             || savedUrl.Contains(":1234")
@@ -38,9 +44,6 @@ public class MainViewModel : INotifyPropertyChanged
         ServerUrl = savedUrl;
         ApiKey = Preferences.Get("bridge_api_key", "");
 
-        ConnectCommand = new Command(async () => await ConnectAsync(), () => CanConnect);
-        DisconnectCommand = new Command(Disconnect, () => CanDisconnect);
-        ToggleMonitoringCommand = new Command(ToggleMonitoring, () => _state == ConnectionState.Connected);
         UpdateStateProperties();
     }
 
@@ -54,7 +57,7 @@ public class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _serverUrl, value))
             {
                 OnPropertyChanged(nameof(CanConnect));
-                ConnectCommand.ChangeCanExecute();
+                ConnectCommand?.ChangeCanExecute();
             }
         }
     }
