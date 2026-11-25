@@ -114,6 +114,24 @@ def test_cors_allows_cross_origin_dashboard():
     assert response.headers.get("access-control-allow-origin") == "*"
 
 
+def test_metrics_cache_avoids_repeated_host_counter_calls():
+    """Many dashboard polls must not spawn a fresh GPU counter query each time."""
+    calls = []
+
+    def provider():
+        calls.append(1)
+        return HostMetrics(11.0, 512)
+
+    def handler(request):
+        raise AssertionError("metrics should not contact LM Studio")
+
+    with make_client(handler, metrics_provider=provider) as client:
+        for _ in range(5):
+            assert client.get("/api/v1/metrics").status_code == 200
+
+    assert len(calls) == 1
+
+
 def test_metrics_match_android_app_contract():
     def handler(request):
         raise AssertionError("metrics should not contact LM Studio")

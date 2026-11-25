@@ -11,7 +11,6 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-import threading
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -165,7 +164,7 @@ try {
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
             capture_output=True,
             text=True,
-            timeout=8,
+            timeout=3,
             check=False,
         )
         if completed.returncode != 0 or not completed.stdout.strip():
@@ -325,11 +324,17 @@ def create_app(
         log_monitor.start()
         runtime_log_monitor.start()
         server_log_monitor.start()
+        model_task = asyncio.create_task(refresh_loaded_model_loop())
         logger.info("LM Studio log monitor status: %s", log_monitor.status)
         logger.info("LM Studio runtime log monitor status: %s", runtime_log_monitor.status)
         try:
             yield
         finally:
+            model_task.cancel()
+            try:
+                await model_task
+            except asyncio.CancelledError:
+                pass
             server_log_monitor.stop()
             runtime_log_monitor.stop()
             log_monitor.stop()
@@ -360,6 +365,30 @@ def create_app(
             if not token or not hmac.compare_digest(token, expected_key):
                 return JSONResponse(status_code=401, content={"error": "unauthorized"})
             return await call_next(request)
+
+    metrics_cache: dict[str, Any] = {"at": 0.0, "value": None}
+    metrics_cache_lock = asyncio.Lock()
+
+    async def cached_host_metrics() -> HostMetrics:
+        """Cache host counters (PowerShell GPU query is slow) across all polls.
+
+        Without this, every dashboard poll spawns a fresh `powershell.exe`
+        counter query; several clients polling together saturate the worker pool
+        and /api/v1/metrics stops responding. Refresh at most once per 3 s.
+        """
+        now = time.monotonic()
+        cached = metrics_cache["value"]
+        if cached is not None and now - metrics_cache["at"] < 3.0:
+            return cached
+        async with metrics_cache_lock:
+            now = time.monotonic()
+            cached = metrics_cache["value"]
+            if cached is not None and now - metrics_cache["at"] < 3.0:
+                return cached
+            value = await asyncio.to_thread(metrics_provider)
+            metrics_cache["value"] = value
+            metrics_cache["at"] = time.monotonic()
+            return value
 
     def target_url(path: str) -> str:
         base_url = settings.lm_studio_url.rstrip("/")
@@ -404,37 +433,41 @@ def create_app(
             )
         return relay(upstream, upstream.content)
 
-    model_cache: dict[str, Any] = {"at": 0.0, "value": None}
-    model_cache_lock = threading.Lock()
+    async def refresh_loaded_model() -> None:
+        """Fetch the model LM Studio has loaded, off the request path.
 
-    def loaded_model() -> dict[str, Any] | None:
-        """The model LM Studio currently has loaded (cached for 15s)."""
-        now = time.monotonic()
-        with model_cache_lock:
-            if now - model_cache["at"] < 15.0:
-                return model_cache["value"]
-        value: dict[str, Any] | None = None
+        A metrics poll must never wait on an upstream HTTP call: with several
+        clients polling at once, a blocking lookup saturates the thread pool and
+        the whole endpoint appears to hang. Refresh on a fixed 15 s cadence
+        instead, keeping the last good value if LM Studio is unreachable.
+        """
         try:
-            response = httpx.get(
-                target_url("/api/v0/models"), headers=upstream_headers(), timeout=5.0
-            )
+            async with client() as upstream_client:
+                response = await upstream_client.get(
+                    target_url("/api/v0/models"),
+                    headers=upstream_headers(),
+                    timeout=5.0,
+                )
             payload = response.json()
             models = payload.get("data", []) if isinstance(payload, dict) else []
             for model in models:
                 if isinstance(model, dict) and model.get("state") == "loaded":
-                    value = {
-                        "id": model.get("id"),
-                        "arch": model.get("arch"),
-                        "quantization": model.get("quantization"),
-                        "maxContextLength": model.get("max_context_length"),
-                    }
-                    break
+                    state.set_loaded_model(
+                        {
+                            "id": model.get("id"),
+                            "arch": model.get("arch"),
+                            "quantization": model.get("quantization"),
+                            "maxContextLength": model.get("max_context_length"),
+                        }
+                    )
+                    return
         except Exception as exc:  # LM Studio may be offline; keep the last value
             logger.debug("Could not read the loaded model: %s", exc)
-        with model_cache_lock:
-            model_cache["at"] = now
-            model_cache["value"] = value
-        return value
+
+    async def refresh_loaded_model_loop() -> None:
+        while True:
+            await refresh_loaded_model()
+            await asyncio.sleep(15.0)
 
     dashboard_template = Path(__file__).with_name("web") / "index.html"
 
@@ -454,12 +487,10 @@ def create_app(
     @app.get("/api/v1/metrics")
     async def metrics() -> dict[str, object]:
         try:
-            # Host counters can shell out to PowerShell; keep the event loop free.
-            host_metrics = await asyncio.to_thread(metrics_provider)
+            host_metrics = await cached_host_metrics()
         except Exception as exc:  # keep metrics endpoint available if a host counter fails
             state.record_error(f"Could not read host metrics: {exc}", source="system")
             host_metrics = HostMetrics(cpu_usage=0.0, memory_used_mb=0)
-        state.set_loaded_model(await asyncio.to_thread(loaded_model))
         snapshot = state.snapshot(
             cpu_usage=host_metrics.cpu_usage,
             memory_used_mb=host_metrics.memory_used_mb,
