@@ -20,6 +20,15 @@ def package_companion(source: Path, output: Path) -> int:
             archive.write(path, path.as_posix())
             included += 1
 
+        # Also expose the launchers at the archive root. Extracting the ZIP
+        # creates a companion-metrics-server folder; a launcher at the root is
+        # discoverable without first entering it, and handles the cd itself.
+        for name in ("start.bat", "start.sh"):
+            launcher = source / name
+            if launcher.is_file():
+                archive.write(launcher, name)
+                included += 1
+
     if included == 0 or output.stat().st_size == 0:
         output.unlink(missing_ok=True)
         raise RuntimeError("Companion project archive would be empty")

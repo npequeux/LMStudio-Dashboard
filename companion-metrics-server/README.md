@@ -28,13 +28,15 @@ By default the bridge connects to LM Studio at `http://127.0.0.1:1234/v1` (the s
 
 ## Install and run on Windows
 
-Open PowerShell in the extracted `companion-metrics-server` folder—the folder containing `pyproject.toml`. Verify you are in the correct directory:
+**Easiest:** extract the release ZIP and double-click `start.bat` (at the extraction root, or inside `companion-metrics-server`). It changes into the right folder, installs dependencies with `uv`, and starts the bridge on port `8000`. Leave the window open while using the dashboard.
+
+If you prefer the command line, open PowerShell in the extracted `companion-metrics-server` folder—the folder containing `pyproject.toml`. Verify you are in the correct directory:
 
 ```powershell
 Test-Path .\pyproject.toml
 ```
 
-It must return `True`. If it returns `False`, change directory into the extracted `companion-metrics-server` folder before continuing. Install the dependencies:
+It must return `True`. If it returns `False`, change directory into the extracted `companion-metrics-server` folder before continuing. Running `uv run uvicorn metrics_server.app:app` from the **parent** folder fails with `ModuleNotFoundError: No module named 'metrics_server'` — that is a wrong-directory error, not a bridge bug. The launcher handles this for you. Install the dependencies:
 
 ```powershell
 uv sync
