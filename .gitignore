@@ -78,6 +78,8 @@ app/debug/
 
 # .NET / MAUI build outputs
 app/bin/
+app-tests/bin/
+app-tests/obj/
 .vs/
 *.user
 
