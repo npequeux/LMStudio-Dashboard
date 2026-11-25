@@ -72,7 +72,7 @@ To find the PC's LAN IPv4 address, run `ipconfig` and use the IPv4 address of th
 http://<PC-LAN-IP>:8000
 ```
 
-For example: `http://192.168.129.35:8000`.
+For example: `http://PC-LAN-IP:8000`.
 
 ## Metrics and proxy behavior
 
@@ -81,7 +81,7 @@ For example: `http://192.168.129.35:8000`.
 - `/api/v1/errors` returns the retained error entries.
 - `/v1/models` and `/v1/chat/completions` proxy to LM Studio.
 
-CPU and system memory are measured on the PC. Token metrics come from the LM Studio desktop app as well as from the bridge's own proxy: the bridge listens to `lms log stream --source model --filter output --stats --json` and records each prediction's token speed and prompt/completion counts, and at startup it seeds the dashboard from the most recent prediction in LM Studio's local conversation history. Proxy requests are measured directly; streaming requests get `stream_options.include_usage` added so a final usage chunk is recorded too. The `logMonitor` field in `/api/v1/metrics` reports the diagnostics listener state (`running`, `retrying`, `unavailable`, or `disabled`). Because LM Studio only reports final token stats when a response finishes, the bridge also tails LM Studio's server logs for `tg = X t/s` timing lines and exposes `liveTokensPerSecond` (null when the engine log level does not include those lines), plus `serverLogMonitor` (`running`, `waiting`, or `disabled`) and a `liveTimingLines` counter — `running` with `0` lines means the log level is the blocker, not the code. Proxy errors are kept in an in-memory rolling log (up to 100 entries); restarting the bridge clears it.
+CPU and system memory are measured on the PC. Token metrics come from LM Studio's diagnostics stream, its runtime log, and predictions routed through the bridge. `lms log stream --source model --stats --json` records each finished prediction's token speed and prompt/completion counts; at startup the bridge seeds the dashboard from the most recent prediction in LM Studio's conversation history. Streaming proxy requests get `stream_options.include_usage` added so they are measured too. The snapshot exposes `logMonitor`, `runtimeLogMonitor` and `serverLogMonitor` states, `liveTimingLines`, `modelIdentifier`/`modelPath` and `loadedModel`, plus `liveTokensPerSecond`. The runtime monitor supplies the live rate; the server-log tailer is only a fallback. Proxy errors are kept in an in-memory rolling log (up to 100 entries); restarting the bridge clears it.
 
 ## Configuration
 
@@ -89,8 +89,10 @@ CPU and system memory are measured on the PC. Token metrics come from the LM Stu
 | --- | --- | --- |
 | `LM_STUDIO_URL` | `http://127.0.0.1:1234/v1` | LM Studio API base URL; `/v1` is supported |
 | `LM_STUDIO_API_KEY` | unset | Optional bearer token for LM Studio |
+| `BRIDGE_API_KEY` | unset | Bearer token required by the bridge's data and proxy routes. `/health` and `/` stay open. Set this before binding to `0.0.0.0` on a shared network. |
+| `ENABLE_API_DOCS` | unset | Set to `1` to expose `/docs` and `/openapi.json`; disabled by default. |
 | `ENABLE_LM_STUDIO_DEBUG_LOGS` | unset | Optional fallback: raise LM Studio's engine log level to Debug so the file-based tailer can also see timing lines. Not normally needed — the runtime log stream works without it. |
-| `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the bridge from a browser (the standalone web dashboard). Restrict, e.g. `http://192.168.129.35:8000`, if the bridge is exposed beyond your LAN. |
+| `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the bridge from a browser (the standalone web dashboard). Restrict, e.g. `http://PC-LAN-IP:8000`, if the bridge is exposed beyond your LAN. |
 
 ### Live token rate
 

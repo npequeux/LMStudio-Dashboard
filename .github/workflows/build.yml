@@ -70,15 +70,31 @@ jobs:
         run: uv run pytest -q
         working-directory: companion-metrics-server
 
+  dotnet-tests:
+    name: .NET bridge client tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run app client tests
+        run: dotnet test app-tests/DashboardLMStudio.Tests.csproj
+
   release:
     name: Release APK (${{ github.event_name }})
-    needs: [build, python-tests]
+    needs: [build, python-tests, dotnet-tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: >-
-      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-      startsWith(github.ref, 'refs/tags/v')
+    # Only version tags publish. Publishing on both main pushes and tags produced
+    # duplicate releases, and the run-number one could be marked Latest.
+    if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout sources
@@ -110,21 +126,31 @@ jobs:
             "" \
             "[Download APK](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/com.example.dashboardlmstudio-Signed.apk)" \
             "[Download companion metrics server](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/DashboardLMStudio_MetricsServer.zip)" > /tmp/release_body.txt
-          gh release create "$TAG_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$RELEASE_NAME" \
-            --notes-file /tmp/release_body.txt \
-            release-assets/com.example.dashboardlmstudio-Signed.apk \
-            release-assets/DashboardLMStudio_MetricsServer.zip
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            # Re-runs must be idempotent: gh release create fails on an existing tag.
+            gh release upload "$TAG_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber \
+              release-assets/com.example.dashboardlmstudio-Signed.apk \
+              release-assets/DashboardLMStudio_MetricsServer.zip
+          else
+            gh release create "$TAG_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_NAME" \
+              --notes-file /tmp/release_body.txt \
+              release-assets/com.example.dashboardlmstudio-Signed.apk \
+              release-assets/DashboardLMStudio_MetricsServer.zip
+          fi
 
   notify:
-    name: Notify on Success/Failure
-    needs: [build, release]
+    name: Verify jobs
+    needs: [build, python-tests, dotnet-tests, release]
     runs-on: ubuntu-latest
     if: always()
 
     steps:
-      - name: Build status
-        run: |
-          echo "Build completed!"
-          echo "Release job skipped (not main branch or not push event)"
+      - name: Fail if a required job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: Job status
+        run: echo "build=${{ needs.build.result }} python=${{ needs.python-tests.result }} dotnet=${{ needs.dotnet-tests.result }} release=${{ needs.release.result }}"

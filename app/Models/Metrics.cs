@@ -19,6 +19,19 @@ public class Metrics
     /// <summary>When the last completed prediction's token stats were recorded.</summary>
     public string? LastUsageAt { get; set; }
 
+    /// <summary>Model that produced the last prediction, from the diagnostics stream.</summary>
+    public string? ModelIdentifier { get; set; }
+    public string? ModelPath { get; set; }
+
+    /// <summary>Model currently loaded in LM Studio, read from /api/v0/models.</summary>
+    public LoadedModelInfo? LoadedModel { get; set; }
+
+    /// <summary>State of the listener that supplies the live token rate.</summary>
+    public string? RuntimeLogMonitor { get; set; }
+    public string? LogMonitor { get; set; }
+    public string? ServerLogMonitor { get; set; }
+    public int LiveTimingLines { get; set; }
+
     public long PromptTokens { get; set; }
     public long CompletionTokens { get; set; }
     public int ErrorCount { get; set; }

@@ -24,6 +24,7 @@ public class MainViewModel : INotifyPropertyChanged
     private bool _monitoring;
     private Timer? _timer;
     private int _polling;
+    private DateTimeOffset _lastAlertAt = DateTimeOffset.MinValue;
 
     public MainViewModel()
     {
@@ -93,6 +94,9 @@ public class MainViewModel : INotifyPropertyChanged
     public string PromptCompletionText { get; private set; } = "0 / 0";
     public string ErrorCountText { get; private set; } = "0";
 
+    /// <summary>Model / monitor state shown under the connection controls.</summary>
+    public string StatusText { get; private set; } = "Not connected.";
+
     public ObservableCollection<ErrorLogEntry> Errors { get; } = new();
 
     public Command ConnectCommand { get; }
@@ -141,6 +145,8 @@ public class MainViewModel : INotifyPropertyChanged
             _client = client;
             _state = ConnectionState.Connected;
             UpdateStateProperties();
+            StatusText = "Connected. Start monitoring.";
+            OnPropertyChanged(nameof(StatusText));
         }
         else
         {
@@ -151,6 +157,8 @@ public class MainViewModel : INotifyPropertyChanged
             }
             _state = ConnectionState.Disconnected;
             UpdateStateProperties();
+            StatusText = "Connection failed.";
+            OnPropertyChanged(nameof(StatusText));
             await ShowMessageAsync($"Failed to connect to {url}");
         }
     }
@@ -162,6 +170,8 @@ public class MainViewModel : INotifyPropertyChanged
         _client = null;
         _state = ConnectionState.Disconnected;
         UpdateStateProperties();
+        StatusText = "Not connected.";
+        OnPropertyChanged(nameof(StatusText));
     }
 
     private void ToggleMonitoring()
@@ -225,8 +235,21 @@ public class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            var message = $"Monitor error: {ex.Message}";
-            RunOnUi(() => _ = ShowMessageAsync(message));
+            // A bridge that goes down would otherwise show a modal alert every
+            // five seconds. Alert at most once a minute; report inline in between.
+            var now = DateTimeOffset.Now;
+            if (now - _lastAlertAt >= TimeSpan.FromSeconds(60))
+            {
+                _lastAlertAt = now;
+                var message = $"Monitor error: {ex.Message}";
+                RunOnUi(() => _ = ShowMessageAsync(message));
+            }
+            var shortMessage = ex.Message.Length > 80 ? ex.Message[..80] + "…" : ex.Message;
+            RunOnUi(() =>
+            {
+                StatusText = "Last error: " + shortMessage;
+                OnPropertyChanged(nameof(StatusText));
+            });
         }
         finally
         {
@@ -262,6 +285,13 @@ public class MainViewModel : INotifyPropertyChanged
         PromptCompletionText = string.Format(
             CultureInfo.InvariantCulture, "{0} / {1}", metrics.PromptTokens, metrics.CompletionTokens);
         ErrorCountText = metrics.ErrorCount.ToString(CultureInfo.InvariantCulture);
+
+        var model = metrics.ModelIdentifier ?? metrics.LoadedModel?.Id;
+        var runtime = string.IsNullOrEmpty(metrics.RuntimeLogMonitor) ? "—" : metrics.RuntimeLogMonitor;
+        StatusText = string.IsNullOrEmpty(model)
+            ? $"runtime log: {runtime} · timing lines: {metrics.LiveTimingLines}"
+            : $"model: {model} · runtime log: {runtime}";
+        OnPropertyChanged(nameof(StatusText));
 
         Errors.Clear();
         foreach (var entry in metrics.Errors)

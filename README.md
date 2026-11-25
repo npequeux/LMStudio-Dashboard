@@ -20,7 +20,7 @@ The same dashboard is also available as a **webpage** — the bridge serves it a
 - [All releases](https://github.com/npequeux/LMStudio-Dashboard/releases)
 - [GitHub Actions builds](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) — temporary debug APK artifacts may require signing in to GitHub.
 
-The direct APK and companion ZIP links become available after the next successful GitHub Release. This build is debug-signed and is for testing only. Each CI run may generate a different debug key; uninstall an older debug build before installing a new one if Android rejects the update. The app requires Android 8.0 (API 26) or later.
+The direct links always point at the latest published GitHub Release. These APKs are debug-signed and are for testing only. Each release's debug key may differ; uninstall an older debug build before installing a new one if Android rejects the update. The app requires Android 8.0 (API 26) or later.
 
 ## Install on Android
 
@@ -34,7 +34,7 @@ These APKs are sideloaded; they are not distributed through Google Play. Only in
 ## Connect and use
 
 1. Start the companion metrics bridge on the PC and make it reachable from the phone. Keep the PC and phone on the same trusted network, and allow TCP port 8000 through the PC firewall for Private networks.
-2. The server URL is prefilled as `http://192.168.129.35:8000`; change it if the PC's LAN IP differs. The app remembers the URL after you connect.
+2. The server URL is prefilled as `http://<PC-LAN-IP>:8000` (the app ships with an example address); change it to the PC running the bridge. The app remembers the URL after you connect.
 3. Tap **Connect**, then **Start Monitoring** after the connection succeeds. Metrics refresh every five seconds. Use **Stop Monitoring** to pause polling and **Disconnect** to release the connection.
 4. If the bridge sets `BRIDGE_API_KEY`, enter the same key in the **Bridge API key** field before connecting.
 5. View CPU, memory, GPU, token-speed, prompt/completion, and error metrics returned by the bridge.
@@ -47,7 +47,7 @@ Token metrics come from two sources. The bridge listens to LM Studio's live infe
 
 - Install [LM Studio for Windows, macOS, or Linux](https://lmstudio.ai/download) and start its API server from the **Developer** tab. The bridge defaults to `http://127.0.0.1:1234/v1` (same machine as LM Studio); configure `LM_STUDIO_URL` if LM Studio runs elsewhere.
 - Run the Python companion service from the `companion-metrics-server` folder in this repository, or download and extract the [companion metrics ZIP](https://github.com/npequeux/LMStudio-Dashboard/releases/latest/download/DashboardLMStudio_MetricsServer.zip). Its default upstream is `http://127.0.0.1:1234/v1`.
-- Enter the bridge URL (`http://192.168.129.35:8000`) in the Android app. LM Studio must be reachable at the configured upstream address.
+- Enter the bridge URL (`http://<PC-LAN-IP>:8000`) in the Android app. LM Studio must be reachable at the configured upstream address.
 
 ### Install the companion metrics service on Windows
 
@@ -72,7 +72,7 @@ Token metrics come from two sources. The bridge listens to LM Studio's live infe
    ```
 
 6. Allow TCP port 8000 through Windows Firewall for **Private networks** only. Keep the bridge running while using the Android app.
-7. In the app, connect to `http://192.168.129.35:8000` (replace the IP if the PC's LAN address differs). Do not enter LM Studio's `:1234/v1` address in the app; that address is for the bridge's upstream connection.
+7. In the app, connect to `http://<PC-LAN-IP>:8000` (replace the placeholder with the PC's LAN address). Do not enter LM Studio's `:1234/v1` address in the app; that address is for the bridge's upstream connection.
 
 If using Python/pip instead of uv, from the companion folder run `py -m venv .venv`, then `.\.venv\Scripts\python -m pip install -e .`, and launch with `.\.venv\Scripts\python -m uvicorn metrics_server.app:app --host 0.0.0.0 --port 8000`.
 
@@ -99,8 +99,9 @@ If using Python/pip instead of uv, from the companion folder run `py -m venv .ve
               ▼
 ┌─────────────────────────────────────────┐
 │        Metrics bridge (FastAPI)          │
+│  GET /                      (web dashboard)             │
 │  GET /health                            │
-│  GET /api/v1/metrics  (logMonitor)      │
+│  GET /api/v1/metrics  (log + runtime monitors)      │
 │  GET /api/v1/errors                     │
 │  POST /v1/chat/completions  (proxy)     │
 └─────────────────────────────────────────┘
@@ -143,13 +144,16 @@ Each push to `main` and each `v*` tag builds the app and publishes a GitHub Rele
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /health` | Connection check |
-| `GET /api/v1/metrics` | CPU, memory, token speed, error metrics, `logMonitor`, `serverLogMonitor`, `lastUsageAt`, and `liveTokensPerSecond` |
+| `GET /` | LCARS web dashboard served by the bridge |
+| `GET /health` | Connection check (open even when a bridge API key is set) |
+| `GET /api/v1/metrics` | CPU, memory, token speed, errors, model in use, `logMonitor`, `runtimeLogMonitor`, `serverLogMonitor`, `liveTimingLines`, `liveTokensPerSecond`, `lastUsageAt` |
 | `GET /api/v1/errors` | Error list (declared in the client, not used by the monitoring screen) |
-| `GET /v1/models` | Proxied to LM Studio (not used by the monitoring screen) |
-| `POST /v1/chat/completions` | Proxied to LM Studio (not used by the monitoring screen) |
+| `GET /v1/models`, `GET /api/v0/models` | Proxied to LM Studio (not used by the monitoring screen) |
+| `POST /v1/chat/completions`, `POST /api/v0/chat/completions` | Proxied to LM Studio (not used by the monitoring screen) |
 
-The monitoring screen requests `/health` and `/api/v1/metrics`; it reads the error list from the metrics response. This Android project does not implement the server-side metrics endpoints.
+The monitoring screen probes `/api/v1/metrics` for both connectivity and data; it reads the error list from that same response.
+
+The server URL is prefilled with an example LAN address; change it to the PC running the bridge. The app remembers the URL after you connect.
 
 ## Dependencies
 - **.NET MAUI 10** - cross-platform UI

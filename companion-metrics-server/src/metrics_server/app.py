@@ -51,6 +51,10 @@ class Settings:
             if origin.strip()
         )
     )
+    enable_api_docs: bool = field(
+        default_factory=lambda: os.getenv("ENABLE_API_DOCS", "").strip().lower()
+        in ("1", "true", "yes", "on")
+    )
 
 
 @dataclass(frozen=True)
@@ -313,6 +317,12 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        if not settings.bridge_api_key:
+            logger.warning(
+                "BRIDGE_API_KEY is not set: metrics and the inference proxy are "
+                "reachable by anyone who can reach this port. Set a key before "
+                "exposing the bridge beyond this machine."
+            )
         # Establish the CPU baseline so the first dashboard reading is not 0.
         await asyncio.to_thread(psutil.cpu_percent, None)
         seed_state_from_history(state, reader=history_reader)
@@ -339,7 +349,14 @@ def create_app(
             runtime_log_monitor.stop()
             log_monitor.stop()
 
-    app = FastAPI(title="DashboardLMStudio Metrics Bridge", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(
+        title="DashboardLMStudio Metrics Bridge",
+        version="1.0.0",
+        lifespan=lifespan,
+        # The interactive docs expose every proxy route; keep them opt-in.
+        docs_url="/docs" if settings.enable_api_docs else None,
+        openapi_url="/openapi.json" if settings.enable_api_docs else None,
+    )
     app.state.metrics_state = state
 
     # Lets the standalone web dashboard (web/index.html) call the bridge from any

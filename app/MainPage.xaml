@@ -80,6 +80,10 @@
                             BackgroundColor="{StaticResource LcarsLightBlue}"
                             TextColor="{StaticResource LcarsInk}"
                             CornerRadius="12" />
+                    <Label Text="{Binding StatusText}"
+                           TextColor="{StaticResource LcarsTextDim}"
+                           FontSize="11"
+                           LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
             </Border>
 

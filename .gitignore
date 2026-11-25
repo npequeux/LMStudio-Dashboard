@@ -11,15 +11,6 @@ split_apks/
 *_split.apk.crc32
 *_split.apk.sha1sum
 
-# Flutter/Dart generated files
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-.build/
-
 # Android Studio generated files and caches
 .idea/
 *.iml
@@ -58,14 +49,6 @@ target/
 *.hprof
 *.trace
 
-# Crashlytics
-crashlytics-build.properties
-crashlytics.properties
-
-# ProGuard/R8
-proguard-rules.pro
-*.pro
-
 # Temporary files
 *.tmp
 *.temp
@@ -101,17 +84,6 @@ app/bin/
 # Generated code (R class, BuildConfig)
 **/generated/**
 **/build/generated/**
-
-# CMake cache files
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-
-# NDK build outputs
-obj/local/
-obj/debug/
-obj/release/
 
 # Android SDK manager
 sdkmanager.log
