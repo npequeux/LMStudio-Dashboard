@@ -104,6 +104,9 @@ class MetricsState:
             last_usage_at = self._last_usage_at
             live_tokens_per_second = self._live_tokens_per_second
             live_tokens_per_second_at = self._live_tokens_per_second_at
+            model_identifier = self._model_identifier
+            model_path = self._model_path
+            loaded_model = self._loaded_model
         return {
             "cpuUsage": round(float(cpu_usage), 1),
             "memoryUsedMB": int(memory_used_mb),
@@ -118,9 +121,9 @@ class MetricsState:
             "lastUsageAt": last_usage_at,
             "liveTokensPerSecond": live_tokens_per_second,
             "liveTokensPerSecondAt": live_tokens_per_second_at,
-            "modelIdentifier": self._model_identifier,
-            "modelPath": self._model_path,
-            "loadedModel": self._loaded_model,
+            "modelIdentifier": model_identifier,
+            "modelPath": model_path,
+            "loadedModel": loaded_model,
         }
 
     def errors(self) -> list[dict[str, str]]:

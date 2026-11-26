@@ -133,12 +133,12 @@ The APK is written to `app/bin/Release/net10.0-android/com.example.dashboardlmst
 
 ## GitHub releases
 
-Each push to `main` and each `v*` tag builds the app and publishes a GitHub Release with the APK and the companion metrics server ZIP. **`v1.0` was the first stable release; `v1.1` adds the live token rate (during a response), the model-in-use line, and the standalone web dashboard.** The APK is debug-signed — there is no release keystore — so it is not suitable for Play Store distribution. A production release would need a persistent keystore and GitHub Actions secrets.
+Each version tag builds the app and publishes a GitHub Release with the APK and the companion metrics server ZIP. **`v1.0` was the first stable release; `v1.1` added the live token rate, `v1.2` the review fixes, and `v1.2.1` hardened the log monitors.** The APK is debug-signed — there is no release keystore — so it is not suitable for Play Store distribution. A production release would need a persistent keystore and GitHub Actions secrets.
 
 ## CI builds
 
 - [Build workflow](https://github.com/npequeux/LMStudio-Dashboard/actions/workflows/build.yml) builds the .NET MAUI APK and runs the Python bridge tests on pushes and pull requests.
-- Pushes to `main` and `v*` tags create a GitHub Release with the APK and the companion metrics server ZIP.
+- Version `v*` tags create a GitHub Release with the APK and the companion metrics server ZIP; pushes and PRs only run the checks.
 
 ## API endpoints
 

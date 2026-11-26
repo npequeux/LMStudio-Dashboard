@@ -196,7 +196,15 @@ class LmsLogMonitor:
             logger.info("Listening to LM Studio inference stats via %s", command)
             backoff = 1.0
 
-            self._consume(process)
+            try:
+                self._consume(process)
+            except Exception as exc:
+                # Never leave a dead thread reporting "running": the dashboard
+                # would show a healthy listener with frozen metrics.
+                logger.warning("LM Studio log stream consumer failed: %s", exc)
+                self._status = "error"
+                if process.poll() is None:
+                    process.terminate()
 
             with self._lock:
                 if self._process is process:
@@ -354,7 +362,13 @@ class RuntimeLogMonitor:
             self._status = "running"
             backoff = 1.0
 
-            self._consume(process)
+            try:
+                self._consume(process)
+            except Exception as exc:
+                logger.warning("LM Studio runtime log consumer failed: %s", exc)
+                self._status = "error"
+                if process.poll() is None:
+                    process.terminate()
 
             with self._lock:
                 if self._process is process:
@@ -489,6 +503,13 @@ class ServerLogMonitor:
             except OSError as exc:
                 logger.debug("LM Studio server log tail failed: %s", exc)
                 self._stop_event.wait(5.0)
+            except Exception as exc:
+                logger.warning("LM Studio server log consumer failed: %s", exc)
+                self._status = "error"
+                self._stop_event.wait(5.0)
+            else:
+                # _tail returned (log rotated or stopped) — avoid a hot loop.
+                self._stop_event.wait(1.0)
 
     def _tail(self, path: Path) -> None:
         with path.open(encoding="utf-8", errors="replace") as handle:
