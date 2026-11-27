@@ -30,7 +30,9 @@ def test_release_zip_is_flat_and_runnable(tmp_path: Path) -> None:
     assert "uv.lock" in names
     assert "src/metrics_server/app.py" in names
     assert "src/metrics_server/web/index.html" in names
+    assert "src/metrics_server/console.py" in names
     assert "start.bat" in names
+    assert "start-console.bat" in names
     assert "start.sh" in names
 
     # A nested companion-metrics-server/ folder is what made the documented

@@ -18,6 +18,19 @@ The status line shows the **model in use** (`modelIdentifier` from the last pred
 
 If `BRIDGE_API_KEY` is set, the page prompts for the key and sends it as a bearer token. `/health` and the dashboard shell stay open, but `/api/v1/metrics` and the proxy stay protected.
 
+## Live console dashboard
+
+The bridge can also render the same LCARS dashboard directly in the terminal while it runs, with live CPU, memory, GPU/VRAM, token rate, prompt/completion counts, the model in use, monitor states, and the error log. It uses 256-colour ANSI (works in Windows Terminal and most modern terminals) and needs no extra dependency.
+
+```powershell
+# extract the release ZIP, then from that folder:
+start-console.bat
+# or manually:
+uv run python -m metrics_server.console --host 0.0.0.0 --port 8000 --interval 2
+```
+
+`Ctrl+C` stops both the console and the bridge. Use plain `start.bat` if you only want the bridge process without the terminal dashboard. `--host`, `--port`, and `--interval` are configurable; the console polls the bridge over loopback so it shows exactly the same payload as the app and the web page.
+
 ## Requirements
 
 - Python 3.11 or later
