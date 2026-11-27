@@ -28,9 +28,9 @@ By default the bridge connects to LM Studio at `http://127.0.0.1:1234/v1` (the s
 
 ## Install and run on Windows
 
-**Easiest:** extract the release ZIP and double-click `start.bat` (at the extraction root, or inside `companion-metrics-server`). It changes into the right folder, installs dependencies with `uv`, and starts the bridge on port `8000`. Leave the window open while using the dashboard.
+**Easiest:** extract the release ZIP and double-click `start.bat` in the extracted folder. It changes into the right directory, installs dependencies with `uv`, and starts the bridge on port `8000`. Leave the window open while using the dashboard.
 
-If you prefer the command line, open PowerShell in the extracted `companion-metrics-server` folder—the folder containing `pyproject.toml`. Verify you are in the correct directory:
+If you prefer the command line, open PowerShell in the extracted folder—the one containing `pyproject.toml`. The ZIP is flat, so this is the folder you see immediately after extraction. Verify you are in the correct directory:
 
 ```powershell
 Test-Path .\pyproject.toml

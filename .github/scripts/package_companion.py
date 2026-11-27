@@ -14,20 +14,14 @@ def package_companion(source: Path, output: Path) -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     included = 0
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+        # Store paths relative to the source folder: extracting the ZIP yields a
+        # folder that IS the uv project (pyproject.toml + src/ at its root), so
+        # `uv run uvicorn metrics_server.app:app` works from where users type it.
         for path in source.rglob("*"):
             if not path.is_file() or any(part in EXCLUDED_PARTS for part in path.parts):
                 continue
-            archive.write(path, path.as_posix())
+            archive.write(path, path.relative_to(source).as_posix())
             included += 1
-
-        # Also expose the launchers at the archive root. Extracting the ZIP
-        # creates a companion-metrics-server folder; a launcher at the root is
-        # discoverable without first entering it, and handles the cd itself.
-        for name in ("start.bat", "start.sh"):
-            launcher = source / name
-            if launcher.is_file():
-                archive.write(launcher, name)
-                included += 1
 
     if included == 0 or output.stat().st_size == 0:
         output.unlink(missing_ok=True)
