@@ -49,6 +49,10 @@ target/
 *.hprof
 *.trace
 
+# Python build outputs
+**/__pycache__/
+*.py[cod]
+
 # Temporary files
 *.tmp
 *.temp
